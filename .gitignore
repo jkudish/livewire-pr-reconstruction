@@ -1,0 +1,8 @@
+.cache/
+.runs/
+.amp/portals/
+__pycache__/
+*.pyc
+*.tsbuildinfo
+review-portal/dist/
+review-portal/node_modules/

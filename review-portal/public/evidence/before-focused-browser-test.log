@@ -1,0 +1,45 @@
+> phpunit --configuration phpunit.xml.dist --testsuite Browser '--filter=test_wire_loading_(attr_restores_existing_attribute_after_renderless_action|class_restores_existing_class_state_after_renderless_action|attr_restores_after_all_overlapping_requests_finish|delay_restores_after_all_overlapping_requests_finish)'
+PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.33
+Configuration: /home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/phpunit.xml.dist
+
+FFFF                                                                4 / 4 (100%)
+
+Time: 00:07.483, Memory: 50.50 MB
+
+There were 4 failures:
+
+1) Livewire\Features\SupportWireLoading\BrowserTest::test_wire_loading_attr_restores_existing_attribute_after_renderless_action
+JavaScript expression [return document.querySelector('[dusk="target"]').disabled] mismatched.
+Failed asserting that false matches expected true.
+
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/vendor/laravel/dusk/src/Concerns/MakesAssertions.php:287
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/src/Features/SupportWireLoading/BrowserTest.php:137
+
+2) Livewire\Features\SupportWireLoading\BrowserTest::test_wire_loading_class_restores_existing_class_state_after_renderless_action
+Element [body [dusk="add"]] missing class [existing].
+Failed asserting that an array contains 'existing'.
+
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/src/Features/SupportTesting/DuskBrowserMacros.php:64
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/vendor/laravel/framework/src/Illuminate/Macroable/Traits/Macroable.php:132
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/vendor/laravel/dusk/src/Browser.php:829
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/src/Features/SupportWireLoading/BrowserTest.php:178
+
+3) Livewire\Features\SupportWireLoading\BrowserTest::test_wire_loading_attr_restores_after_all_overlapping_requests_finish
+Did not see expected attribute [disabled] within element [body [dusk="target"]].
+Failed asserting that null is not null.
+
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/vendor/laravel/dusk/src/Concerns/MakesAssertions.php:781
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/src/Features/SupportWireLoading/BrowserTest.php:232
+
+4) Livewire\Features\SupportWireLoading\BrowserTest::test_wire_loading_delay_restores_after_all_overlapping_requests_finish
+Did not see expected attribute [disabled] within element [body [dusk="target"]].
+Failed asserting that null is not null.
+
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/vendor/laravel/dusk/src/Concerns/MakesAssertions.php:781
+/home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/before/src/Features/SupportWireLoading/BrowserTest.php:285
+
+FAILURES!
+Tests: 4, Assertions: 10, Failures: 4, PHPUnit Deprecations: 2.
+Script phpunit --configuration phpunit.xml.dist --testsuite Browser handling the test:browser event returned with error code 1

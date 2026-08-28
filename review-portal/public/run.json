@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "run": {
+    "id": "livewire-10610-59553fcadb26",
+    "attempt": 1,
+    "status": "prepared",
+    "created_at": "2026-08-28T18:29:17.741386+00:00"
+  },
+  "target": {
+    "repository": "livewire/livewire",
+    "pull_request": 10610,
+    "url": "https://github.com/livewire/livewire/pull/10610"
+  },
+  "pr": {
+    "number": 10610,
+    "title": "[4.x] Restore existing attributes and classes after wire:loading",
+    "source": "PR description, changed browser tests, production code, and observed behavior",
+    "confidence": "high"
+  },
+  "revisions": {
+    "base": "d089bc5837b35be7e73df79a351e2e2a60111b4d",
+    "head": "59553fcadb264748f15c1dd515c6543ea661d988",
+    "reconstruction": "ce59fcce7492c50aec558651a9b40743170a8b86"
+  },
+  "review_status": "verified",
+  "evidence": [
+    {
+      "environment": "before",
+      "status": "failed",
+      "assertion": "Existing DOM state survives one continuous loading period.",
+      "explanation": "All four focused regressions fail. In the playground, the fast request finishes while the slow request is still pending, but the target becomes enabled and loses its existing class.",
+      "output": "Exit 1 \u00b7 4 tests, 10 assertions, 4 failures\nAttribute restoration: disabled became false\nClass restoration: existing class disappeared\nOverlap + delay: disabled disappeared before the slow request finished",
+      "artifacts": [
+        {
+          "label": "Broken overlap screenshot",
+          "url": "/evidence/before-overlap.png",
+          "type": "image"
+        },
+        {
+          "label": "Focused browser test output",
+          "url": "/evidence/before-focused-browser-test.log",
+          "type": "log"
+        }
+      ]
+    },
+    {
+      "environment": "original",
+      "status": "passed",
+      "assertion": "Existing DOM state survives one continuous loading period.",
+      "explanation": "The submitted PR keeps loading active through the final overlapping request, then restores the exact attribute and class state captured at the start.",
+      "output": "Exit 0 \u00b7 4 tests, 17 assertions \u00b7 PASS\nPlayground after fast request: disabled=true, classes=target existing loading-added\nPlayground after slow request: disabled=false, classes=target existing",
+      "artifacts": [
+        {
+          "label": "Working overlap screenshot",
+          "url": "/evidence/original-overlap.png",
+          "type": "image"
+        },
+        {
+          "label": "Focused browser test output",
+          "url": "/evidence/original-focused-browser-test.log",
+          "type": "log"
+        }
+      ]
+    },
+    {
+      "environment": "reconstruction",
+      "status": "passed",
+      "assertion": "Existing DOM state survives one continuous loading period.",
+      "explanation": "Two independently ordered causal steps reproduce the submitted production fix exactly and pass the same executable evidence.",
+      "output": "Exit 0 \u00b7 4 tests, 17 assertions \u00b7 PASS\nJavaScript suite: 110 passed, 1 skipped\nProduction comparison with Original: identical",
+      "artifacts": [
+        {
+          "label": "Working reconstruction screenshot",
+          "url": "/evidence/reconstruction-overlap.png",
+          "type": "image"
+        },
+        {
+          "label": "Focused browser test output",
+          "url": "/evidence/reconstruction-focused-browser-test.log",
+          "type": "log"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "before",
+      "label": "Before",
+      "sha": "d089bc5837b35be7e73df79a351e2e2a60111b4d",
+      "description": "Merge base with submitted regression tests overlaid"
+    },
+    {
+      "id": "original",
+      "label": "Original",
+      "sha": "59553fcadb264748f15c1dd515c6543ea661d988",
+      "description": "Exact submitted PR head"
+    },
+    {
+      "id": "reconstruction",
+      "label": "Reconstruction",
+      "sha": "ce59fcce7492c50aec558651a9b40743170a8b86",
+      "description": "Merge base plus two causal commits"
+    }
+  ],
+  "stories": [
+    {
+      "id": "restore-owned-state",
+      "title": "Restore what existed before loading began",
+      "what_was_wrong": "Cleanup always applied the inverse loading operation. It removed attributes and classes even when Alpine or the server-rendered DOM had already put them there.",
+      "what_changed": "The first loading start snapshots the named attribute value and each named class membership, then cleanup restores that exact snapshot.",
+      "why_necessary": "A renderless action has no later morph to repair DOM state that loading cleanup destroyed.",
+      "proof": "The two renderless attribute/class regressions fail Before and pass in Original and Reconstruction.",
+      "diff_ids": [
+        "step-1-1-js-directives-wire-loading-js"
+      ]
+    },
+    {
+      "id": "one-loading-period",
+      "title": "Treat overlap as one loading period",
+      "what_was_wrong": "Each request independently ended loading, so the first completed request could restore the target while another request was still active. Delayed loading made the race easier to expose.",
+      "what_changed": "A local active count captures and starts loading only on the first request, then restores only after the final request finishes.",
+      "why_necessary": "The element owns one visible loading period, not one toggle lifecycle per transport request.",
+      "proof": "Both overlap regressions and the live playground keep the target disabled after Fast finishes and restore it only after Slow finishes.",
+      "diff_ids": [
+        "step-2-1-js-directives-wire-loading-js"
+      ]
+    }
+  ],
+  "diffs": [
+    {
+      "id": "original-1-js-directives-wire-loading-js",
+      "label": "Submitted PR \u00b7 js/directives/wire-loading.js",
+      "kind": "original",
+      "category": "production",
+      "patch": "diff --git a/js/directives/wire-loading.js b/js/directives/wire-loading.js\nindex daa4ee0e..dd18c6dd 100644\n--- a/js/directives/wire-loading.js\n+++ b/js/directives/wire-loading.js\n@@ -10,14 +10,49 @@ directive('loading', ({ el, directive, component, cleanup }) => {\n \n     let [delay, abortDelay] = applyDelay(directive)\n \n+    let restoreLoadingState = () => toggleBooleanStateDirective(el, directive, false)\n+    let activeLoadingCount = 0\n+\n+    let startLoading = () => {\n+        if (activeLoadingCount === 0) {\n+            if (directive.modifiers.includes('class')) {\n+                let classes = directive.expression.split(' ').filter(String)\n+                let classStates = classes.map(className => [className, el.classList.contains(className)])\n+\n+                restoreLoadingState = () => classStates.forEach(([className, wasPresent]) => {\n+                    el.classList.toggle(className, wasPresent)\n+                })\n+            } else if (directive.modifiers.includes('attr')) {\n+                let attribute = directive.expression\n+                let value = el.getAttribute(attribute)\n+\n+                restoreLoadingState = value === null\n+                    ? () => el.removeAttribute(attribute)\n+                    : () => el.setAttribute(attribute, value)\n+            }\n+\n+            delay(() => toggleBooleanStateDirective(el, directive, true))\n+        }\n+\n+        activeLoadingCount++\n+    }\n+\n+    let endLoading = () => {\n+        if (activeLoadingCount === 0) return\n+\n+        activeLoadingCount--\n+\n+        if (activeLoadingCount === 0) abortDelay(restoreLoadingState)\n+    }\n+\n     let cleanupA = whenTargetsArePartOfRequest(component, el, targets, inverted, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     let cleanupB = whenTargetsArePartOfFileUpload(component, targets, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     cleanup(() => {\n"
+    },
+    {
+      "id": "original-2-src-features-supportwireloading-browsertest-php",
+      "label": "Submitted PR \u00b7 src/Features/SupportWireLoading/BrowserTest.php",
+      "kind": "original",
+      "category": "evidence",
+      "patch": "diff --git a/src/Features/SupportWireLoading/BrowserTest.php b/src/Features/SupportWireLoading/BrowserTest.php\nindex 0c6e278f..672d53c1 100644\n--- a/src/Features/SupportWireLoading/BrowserTest.php\n+++ b/src/Features/SupportWireLoading/BrowserTest.php\n@@ -104,6 +104,190 @@ class BrowserTest extends \\Tests\\BrowserTestCase\n         ;\n     }\n \n+    function test_wire_loading_attr_restores_existing_attribute_after_renderless_action()\n+    {\n+        Livewire::visit(new class extends Component {\n+            public bool $disabled = true;\n+\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function renderlessAction() {\n+                usleep(250000);\n+            }\n+\n+            public function render() {\n+                return <<<'HTML'\n+                    <div>\n+                        <button type=\"button\" wire:click=\"renderlessAction\" dusk=\"renderless\">\n+                            Renderless action\n+                        </button>\n+\n+                        <button\n+                            type=\"button\"\n+                            x-bind:disabled=\"$wire.$get('disabled')\"\n+                            wire:loading.attr=\"disabled\"\n+                            dusk=\"target\">\n+                            Target\n+                        </button>\n+                    </div>\n+                HTML;\n+            }\n+        })\n+        ->waitUntil('document.querySelector(\\'[dusk=\"target\"]\\').disabled === true')\n+        ->waitForLivewire()->click('@renderless')\n+        ->assertScript('document.querySelector(\\'[dusk=\"target\"]\\').disabled', true)\n+        ;\n+    }\n+\n+    function test_wire_loading_class_restores_existing_class_state_after_renderless_action()\n+    {\n+        Livewire::visit(new class extends Component {\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function renderlessAction() {\n+                usleep(250000);\n+            }\n+\n+            public function render() {\n+                return <<<'HTML'\n+                    <div>\n+                        <button type=\"button\" wire:click=\"renderlessAction\" dusk=\"renderless\">\n+                            Renderless action\n+                        </button>\n+\n+                        <div\n+                            class=\"existing\"\n+                            wire:loading.class=\"existing added\"\n+                            dusk=\"add\">\n+                            Add classes\n+                        </div>\n+\n+                        <div\n+                            class=\"existing\"\n+                            wire:loading.class.remove=\"existing absent\"\n+                            dusk=\"remove\">\n+                            Remove classes\n+                        </div>\n+                    </div>\n+                HTML;\n+            }\n+        })\n+        ->assertHasClass('@add', 'existing')\n+        ->assertScript('document.querySelector(\\'[dusk=\"add\"]\\').classList.contains(\\'added\\')', false)\n+        ->assertHasClass('@remove', 'existing')\n+        ->assertScript('document.querySelector(\\'[dusk=\"remove\"]\\').classList.contains(\\'absent\\')', false)\n+        ->waitForLivewire()->click('@renderless')\n+        ->assertHasClass('@add', 'existing')\n+        ->assertScript('document.querySelector(\\'[dusk=\"add\"]\\').classList.contains(\\'added\\')', false)\n+        ->assertHasClass('@remove', 'existing')\n+        ->assertScript('document.querySelector(\\'[dusk=\"remove\"]\\').classList.contains(\\'absent\\')', false)\n+        ;\n+    }\n+\n+    function test_wire_loading_attr_restores_after_all_overlapping_requests_finish()\n+    {\n+        Livewire::visit(new class extends Component {\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function slowAction() {\n+                usleep(500000);\n+\n+                $this->dispatch('slow-finished');\n+            }\n+\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function fastAction() {\n+                usleep(100000);\n+\n+                $this->dispatch('fast-finished');\n+            }\n+\n+            public function render() {\n+                return <<<'HTML'\n+                    <div\n+                        x-data=\"{ fastFinished: false, slowFinished: false }\"\n+                        x-on:fast-finished.window=\"fastFinished = true\"\n+                        x-on:slow-finished.window=\"slowFinished = true\"\n+                    >\n+                        <button type=\"button\" wire:click.async=\"slowAction\" dusk=\"slow\">\n+                            Slow action\n+                        </button>\n+\n+                        <button type=\"button\" wire:click.async=\"fastAction\" dusk=\"fast\">\n+                            Fast action\n+                        </button>\n+\n+                        <button type=\"button\" wire:loading.attr=\"disabled\" dusk=\"target\">\n+                            Target\n+                        </button>\n+\n+                        <span x-show=\"fastFinished\">Fast finished</span>\n+                        <span x-show=\"slowFinished\">Slow finished</span>\n+                    </div>\n+                HTML;\n+            }\n+        })\n+        ->waitForLivewireToLoad()\n+        ->assertAttributeMissing('@target', 'disabled')\n+        ->click('@fast')\n+        ->click('@slow')\n+        ->waitForText('Fast finished')\n+        ->assertAttribute('@target', 'disabled', 'true')\n+        ->waitForText('Slow finished')\n+        ->assertAttributeMissing('@target', 'disabled')\n+        ;\n+    }\n+\n+    function test_wire_loading_delay_restores_after_all_overlapping_requests_finish()\n+    {\n+        Livewire::visit(new class extends Component {\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function slowAction() {\n+                usleep(500000);\n+\n+                $this->dispatch('slow-finished');\n+            }\n+\n+            #[\\Livewire\\Attributes\\Renderless]\n+            public function fastAction() {\n+                usleep(100000);\n+\n+                $this->dispatch('fast-finished');\n+            }\n+\n+            public function render() {\n+                return <<<'HTML'\n+                    <div\n+                        x-data=\"{ fastFinished: false, slowFinished: false }\"\n+                        x-on:fast-finished.window=\"fastFinished = true\"\n+                        x-on:slow-finished.window=\"slowFinished = true\"\n+                    >\n+                        <button type=\"button\" wire:click.async=\"slowAction\" dusk=\"slow\">\n+                            Slow action\n+                        </button>\n+\n+                        <button type=\"button\" wire:click.async=\"fastAction\" dusk=\"fast\">\n+                            Fast action\n+                        </button>\n+\n+                        <button type=\"button\" wire:loading.delay.shortest.attr=\"disabled\" dusk=\"target\">\n+                            Target\n+                        </button>\n+\n+                        <span x-show=\"fastFinished\">Fast finished</span>\n+                        <span x-show=\"slowFinished\">Slow finished</span>\n+                    </div>\n+                HTML;\n+            }\n+        })\n+        ->waitForLivewireToLoad()\n+        ->assertAttributeMissing('@target', 'disabled')\n+        ->click('@fast')\n+        ->click('@slow')\n+        ->waitForText('Fast finished')\n+        ->assertAttribute('@target', 'disabled', 'true')\n+        ->waitForText('Slow finished')\n+        ->assertAttributeMissing('@target', 'disabled')\n+        ;\n+    }\n+\n     function test_wire_loading_attr_doesnt_conflict_with_exist_one()\n     {\n         Livewire::visit(new class extends Component {\n"
+    },
+    {
+      "id": "reconstruction-1-js-directives-wire-loading-js",
+      "label": "Reconstruction \u00b7 js/directives/wire-loading.js",
+      "kind": "reconstruction",
+      "category": "production",
+      "patch": "diff --git a/js/directives/wire-loading.js b/js/directives/wire-loading.js\nindex daa4ee0e..dd18c6dd 100644\n--- a/js/directives/wire-loading.js\n+++ b/js/directives/wire-loading.js\n@@ -10,14 +10,49 @@ directive('loading', ({ el, directive, component, cleanup }) => {\n \n     let [delay, abortDelay] = applyDelay(directive)\n \n+    let restoreLoadingState = () => toggleBooleanStateDirective(el, directive, false)\n+    let activeLoadingCount = 0\n+\n+    let startLoading = () => {\n+        if (activeLoadingCount === 0) {\n+            if (directive.modifiers.includes('class')) {\n+                let classes = directive.expression.split(' ').filter(String)\n+                let classStates = classes.map(className => [className, el.classList.contains(className)])\n+\n+                restoreLoadingState = () => classStates.forEach(([className, wasPresent]) => {\n+                    el.classList.toggle(className, wasPresent)\n+                })\n+            } else if (directive.modifiers.includes('attr')) {\n+                let attribute = directive.expression\n+                let value = el.getAttribute(attribute)\n+\n+                restoreLoadingState = value === null\n+                    ? () => el.removeAttribute(attribute)\n+                    : () => el.setAttribute(attribute, value)\n+            }\n+\n+            delay(() => toggleBooleanStateDirective(el, directive, true))\n+        }\n+\n+        activeLoadingCount++\n+    }\n+\n+    let endLoading = () => {\n+        if (activeLoadingCount === 0) return\n+\n+        activeLoadingCount--\n+\n+        if (activeLoadingCount === 0) abortDelay(restoreLoadingState)\n+    }\n+\n     let cleanupA = whenTargetsArePartOfRequest(component, el, targets, inverted, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     let cleanupB = whenTargetsArePartOfFileUpload(component, targets, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     cleanup(() => {\n"
+    },
+    {
+      "id": "step-1-1-js-directives-wire-loading-js",
+      "label": "Step 1: Restore loading-owned attributes and classes \u00b7 js/directives/wire-loading.js",
+      "kind": "step",
+      "category": "production",
+      "patch": "diff --git a/js/directives/wire-loading.js b/js/directives/wire-loading.js\nindex daa4ee0e..81b8472f 100644\n--- a/js/directives/wire-loading.js\n+++ b/js/directives/wire-loading.js\n@@ -10,14 +10,38 @@ directive('loading', ({ el, directive, component, cleanup }) => {\n \n     let [delay, abortDelay] = applyDelay(directive)\n \n+    let restoreLoadingState = () => toggleBooleanStateDirective(el, directive, false)\n+\n+    let startLoading = () => {\n+        if (directive.modifiers.includes('class')) {\n+            let classes = directive.expression.split(' ').filter(String)\n+            let classStates = classes.map(className => [className, el.classList.contains(className)])\n+\n+            restoreLoadingState = () => classStates.forEach(([className, wasPresent]) => {\n+                el.classList.toggle(className, wasPresent)\n+            })\n+        } else if (directive.modifiers.includes('attr')) {\n+            let attribute = directive.expression\n+            let value = el.getAttribute(attribute)\n+\n+            restoreLoadingState = value === null\n+                ? () => el.removeAttribute(attribute)\n+                : () => el.setAttribute(attribute, value)\n+        }\n+\n+        delay(() => toggleBooleanStateDirective(el, directive, true))\n+    }\n+\n+    let endLoading = () => abortDelay(restoreLoadingState)\n+\n     let cleanupA = whenTargetsArePartOfRequest(component, el, targets, inverted, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     let cleanupB = whenTargetsArePartOfFileUpload(component, targets, [\n-        () => delay(() => toggleBooleanStateDirective(el, directive, true)),\n-        () => abortDelay(() => toggleBooleanStateDirective(el, directive, false)),\n+        startLoading,\n+        endLoading,\n     ])\n \n     cleanup(() => {\n",
+      "reconstruction_commit": "d89603f10bd0076a79da1d3bb43102e945cf0888"
+    },
+    {
+      "id": "step-2-1-js-directives-wire-loading-js",
+      "label": "Step 2: Treat overlapping requests as one loading period \u00b7 js/directives/wire-loading.js",
+      "kind": "step",
+      "category": "production",
+      "patch": "diff --git a/js/directives/wire-loading.js b/js/directives/wire-loading.js\nindex 81b8472f..dd18c6dd 100644\n--- a/js/directives/wire-loading.js\n+++ b/js/directives/wire-loading.js\n@@ -11,28 +11,39 @@ directive('loading', ({ el, directive, component, cleanup }) => {\n     let [delay, abortDelay] = applyDelay(directive)\n \n     let restoreLoadingState = () => toggleBooleanStateDirective(el, directive, false)\n+    let activeLoadingCount = 0\n \n     let startLoading = () => {\n-        if (directive.modifiers.includes('class')) {\n-            let classes = directive.expression.split(' ').filter(String)\n-            let classStates = classes.map(className => [className, el.classList.contains(className)])\n-\n-            restoreLoadingState = () => classStates.forEach(([className, wasPresent]) => {\n-                el.classList.toggle(className, wasPresent)\n-            })\n-        } else if (directive.modifiers.includes('attr')) {\n-            let attribute = directive.expression\n-            let value = el.getAttribute(attribute)\n+        if (activeLoadingCount === 0) {\n+            if (directive.modifiers.includes('class')) {\n+                let classes = directive.expression.split(' ').filter(String)\n+                let classStates = classes.map(className => [className, el.classList.contains(className)])\n+\n+                restoreLoadingState = () => classStates.forEach(([className, wasPresent]) => {\n+                    el.classList.toggle(className, wasPresent)\n+                })\n+            } else if (directive.modifiers.includes('attr')) {\n+                let attribute = directive.expression\n+                let value = el.getAttribute(attribute)\n+\n+                restoreLoadingState = value === null\n+                    ? () => el.removeAttribute(attribute)\n+                    : () => el.setAttribute(attribute, value)\n+            }\n \n-            restoreLoadingState = value === null\n-                ? () => el.removeAttribute(attribute)\n-                : () => el.setAttribute(attribute, value)\n+            delay(() => toggleBooleanStateDirective(el, directive, true))\n         }\n \n-        delay(() => toggleBooleanStateDirective(el, directive, true))\n+        activeLoadingCount++\n     }\n \n-    let endLoading = () => abortDelay(restoreLoadingState)\n+    let endLoading = () => {\n+        if (activeLoadingCount === 0) return\n+\n+        activeLoadingCount--\n+\n+        if (activeLoadingCount === 0) abortDelay(restoreLoadingState)\n+    }\n \n     let cleanupA = whenTargetsArePartOfRequest(component, el, targets, inverted, [\n         startLoading,\n",
+      "reconstruction_commit": "ce59fcce7492c50aec558651a9b40743170a8b86"
+    },
+    {
+      "id": "comparison-1-src-features-supportwireloading-browsertest-php",
+      "label": "Original vs reconstruction \u00b7 src/Features/SupportWireLoading/BrowserTest.php",
+      "kind": "comparison",
+      "category": "evidence",
+      "patch": "diff --git a/src/Features/SupportWireLoading/BrowserTest.php b/src/Features/SupportWireLoading/BrowserTest.php\nindex 672d53c1..0c6e278f 100644\n--- a/src/Features/SupportWireLoading/BrowserTest.php\n+++ b/src/Features/SupportWireLoading/BrowserTest.php\n@@ -104,190 +104,6 @@ class BrowserTest extends \\Tests\\BrowserTestCase\n         ;\n     }\n \n-    function test_wire_loading_attr_restores_existing_attribute_after_renderless_action()\n-    {\n-        Livewire::visit(new class extends Component {\n-            public bool $disabled = true;\n-\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function renderlessAction() {\n-                usleep(250000);\n-            }\n-\n-            public function render() {\n-                return <<<'HTML'\n-                    <div>\n-                        <button type=\"button\" wire:click=\"renderlessAction\" dusk=\"renderless\">\n-                            Renderless action\n-                        </button>\n-\n-                        <button\n-                            type=\"button\"\n-                            x-bind:disabled=\"$wire.$get('disabled')\"\n-                            wire:loading.attr=\"disabled\"\n-                            dusk=\"target\">\n-                            Target\n-                        </button>\n-                    </div>\n-                HTML;\n-            }\n-        })\n-        ->waitUntil('document.querySelector(\\'[dusk=\"target\"]\\').disabled === true')\n-        ->waitForLivewire()->click('@renderless')\n-        ->assertScript('document.querySelector(\\'[dusk=\"target\"]\\').disabled', true)\n-        ;\n-    }\n-\n-    function test_wire_loading_class_restores_existing_class_state_after_renderless_action()\n-    {\n-        Livewire::visit(new class extends Component {\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function renderlessAction() {\n-                usleep(250000);\n-            }\n-\n-            public function render() {\n-                return <<<'HTML'\n-                    <div>\n-                        <button type=\"button\" wire:click=\"renderlessAction\" dusk=\"renderless\">\n-                            Renderless action\n-                        </button>\n-\n-                        <div\n-                            class=\"existing\"\n-                            wire:loading.class=\"existing added\"\n-                            dusk=\"add\">\n-                            Add classes\n-                        </div>\n-\n-                        <div\n-                            class=\"existing\"\n-                            wire:loading.class.remove=\"existing absent\"\n-                            dusk=\"remove\">\n-                            Remove classes\n-                        </div>\n-                    </div>\n-                HTML;\n-            }\n-        })\n-        ->assertHasClass('@add', 'existing')\n-        ->assertScript('document.querySelector(\\'[dusk=\"add\"]\\').classList.contains(\\'added\\')', false)\n-        ->assertHasClass('@remove', 'existing')\n-        ->assertScript('document.querySelector(\\'[dusk=\"remove\"]\\').classList.contains(\\'absent\\')', false)\n-        ->waitForLivewire()->click('@renderless')\n-        ->assertHasClass('@add', 'existing')\n-        ->assertScript('document.querySelector(\\'[dusk=\"add\"]\\').classList.contains(\\'added\\')', false)\n-        ->assertHasClass('@remove', 'existing')\n-        ->assertScript('document.querySelector(\\'[dusk=\"remove\"]\\').classList.contains(\\'absent\\')', false)\n-        ;\n-    }\n-\n-    function test_wire_loading_attr_restores_after_all_overlapping_requests_finish()\n-    {\n-        Livewire::visit(new class extends Component {\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function slowAction() {\n-                usleep(500000);\n-\n-                $this->dispatch('slow-finished');\n-            }\n-\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function fastAction() {\n-                usleep(100000);\n-\n-                $this->dispatch('fast-finished');\n-            }\n-\n-            public function render() {\n-                return <<<'HTML'\n-                    <div\n-                        x-data=\"{ fastFinished: false, slowFinished: false }\"\n-                        x-on:fast-finished.window=\"fastFinished = true\"\n-                        x-on:slow-finished.window=\"slowFinished = true\"\n-                    >\n-                        <button type=\"button\" wire:click.async=\"slowAction\" dusk=\"slow\">\n-                            Slow action\n-                        </button>\n-\n-                        <button type=\"button\" wire:click.async=\"fastAction\" dusk=\"fast\">\n-                            Fast action\n-                        </button>\n-\n-                        <button type=\"button\" wire:loading.attr=\"disabled\" dusk=\"target\">\n-                            Target\n-                        </button>\n-\n-                        <span x-show=\"fastFinished\">Fast finished</span>\n-                        <span x-show=\"slowFinished\">Slow finished</span>\n-                    </div>\n-                HTML;\n-            }\n-        })\n-        ->waitForLivewireToLoad()\n-        ->assertAttributeMissing('@target', 'disabled')\n-        ->click('@fast')\n-        ->click('@slow')\n-        ->waitForText('Fast finished')\n-        ->assertAttribute('@target', 'disabled', 'true')\n-        ->waitForText('Slow finished')\n-        ->assertAttributeMissing('@target', 'disabled')\n-        ;\n-    }\n-\n-    function test_wire_loading_delay_restores_after_all_overlapping_requests_finish()\n-    {\n-        Livewire::visit(new class extends Component {\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function slowAction() {\n-                usleep(500000);\n-\n-                $this->dispatch('slow-finished');\n-            }\n-\n-            #[\\Livewire\\Attributes\\Renderless]\n-            public function fastAction() {\n-                usleep(100000);\n-\n-                $this->dispatch('fast-finished');\n-            }\n-\n-            public function render() {\n-                return <<<'HTML'\n-                    <div\n-                        x-data=\"{ fastFinished: false, slowFinished: false }\"\n-                        x-on:fast-finished.window=\"fastFinished = true\"\n-                        x-on:slow-finished.window=\"slowFinished = true\"\n-                    >\n-                        <button type=\"button\" wire:click.async=\"slowAction\" dusk=\"slow\">\n-                            Slow action\n-                        </button>\n-\n-                        <button type=\"button\" wire:click.async=\"fastAction\" dusk=\"fast\">\n-                            Fast action\n-                        </button>\n-\n-                        <button type=\"button\" wire:loading.delay.shortest.attr=\"disabled\" dusk=\"target\">\n-                            Target\n-                        </button>\n-\n-                        <span x-show=\"fastFinished\">Fast finished</span>\n-                        <span x-show=\"slowFinished\">Slow finished</span>\n-                    </div>\n-                HTML;\n-            }\n-        })\n-        ->waitForLivewireToLoad()\n-        ->assertAttributeMissing('@target', 'disabled')\n-        ->click('@fast')\n-        ->click('@slow')\n-        ->waitForText('Fast finished')\n-        ->assertAttribute('@target', 'disabled', 'true')\n-        ->waitForText('Slow finished')\n-        ->assertAttributeMissing('@target', 'disabled')\n-        ;\n-    }\n-\n     function test_wire_loading_attr_doesnt_conflict_with_exist_one()\n     {\n         Livewire::visit(new class extends Component {\n"
+    }
+  ],
+  "uncertainties": [],
+  "unjustified_production_changes": [],
+  "learning_events": [
+    {
+      "kind": "repository_pattern",
+      "scope": "livewire/livewire",
+      "statement": "For wire:loading, overlapping transport requests form one element-owned loading period; restore state only at the final completion.",
+      "confidence": "high",
+      "source": "PR #10610 executable evidence"
+    }
+  ],
+  "actions": []
+}

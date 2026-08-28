@@ -1,0 +1,36 @@
+services:
+  before:
+    command: ./scripts/serve-environment before
+    port: 8101
+    health: /
+    portal: true
+    review: true
+    agent: control
+
+  original:
+    command: ./scripts/serve-environment original
+    port: 8102
+    health: /
+    portal: true
+    review: true
+    agent: control
+
+  reconstruction:
+    command: ./scripts/serve-environment reconstruction
+    port: 8103
+    health: /
+    portal: true
+    review: true
+    agent: control
+
+  review:
+    command: ./scripts/serve-review
+    port: 4173
+    health: /
+    portal: true
+    review: true
+    agent: control
+    env:
+      BEFORE_URL: ${services.before.publicURL}
+      ORIGINAL_URL: ${services.original.publicURL}
+      RECONSTRUCTION_URL: ${services.reconstruction.publicURL}

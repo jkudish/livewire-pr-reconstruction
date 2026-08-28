@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: $0 before|original|reconstruction" >&2
+  exit 1
+fi
+
+state="$1"
+case "$state" in
+  before|original|reconstruction) ;;
+  *) echo "unknown environment: $state" >&2; exit 1 ;;
+esac
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+app="$repo_root/.runs/current/apps/$state"
+port="${PORT:-8000}"
+
+if [[ -f "$app/artisan" ]]; then
+  exec php "$app/artisan" serve --host=0.0.0.0 --port="$port"
+fi
+
+exec python3 "$repo_root/scripts/environment_status_server.py" --environment "$state" --port "$port"

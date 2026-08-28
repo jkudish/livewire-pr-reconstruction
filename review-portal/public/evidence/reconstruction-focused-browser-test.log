@@ -1,0 +1,12 @@
+> phpunit --configuration phpunit.xml.dist --testsuite Browser '--filter=test_wire_loading_(attr_restores_existing_attribute_after_renderless_action|class_restores_existing_class_state_after_renderless_action|attr_restores_after_all_overlapping_requests_finish|delay_restores_after_all_overlapping_requests_finish)'
+PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.33
+Configuration: /home/user/workspace/livewire-pr-reconstruction/.runs/livewire-10610-59553fcadb26/targets/reconstruction/phpunit.xml.dist
+
+....                                                                4 / 4 (100%)
+
+Time: 00:07.880, Memory: 48.50 MB
+
+OK, but there were issues!
+Tests: 4, Assertions: 17, PHPUnit Deprecations: 2.

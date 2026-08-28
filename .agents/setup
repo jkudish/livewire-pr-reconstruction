@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() {
+  printf '\n==> %s\n' "$1"
+}
+
+missing_packages=()
+for package in php-cli php-curl php-mbstring php-xml php-zip php-sqlite3 composer; do
+  dpkg -s "$package" >/dev/null 2>&1 || missing_packages+=("$package")
+done
+
+if ((${#missing_packages[@]})); then
+  step "Installing PHP and Composer"
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_packages[@]}"
+fi
+
+if ! command -v google-chrome >/dev/null 2>&1; then
+  chrome_candidates=("$HOME"/.agent-browser/browsers/chrome-*/chrome)
+
+  if [[ ! -x "${chrome_candidates[0]:-}" ]]; then
+    step "Installing Chrome for browser evidence"
+    agent-browser install --with-deps
+    chrome_candidates=("$HOME"/.agent-browser/browsers/chrome-*/chrome)
+  fi
+
+  if [[ ! -x "${chrome_candidates[0]:-}" ]]; then
+    echo "Chrome installation did not produce a runnable browser." >&2
+    exit 1
+  fi
+
+  sudo ln -sfn "${chrome_candidates[0]}" /usr/bin/google-chrome
+fi
+
+step "Installing Review Portal dependencies"
+npm --prefix review-portal ci --no-audit --no-fund
+
+step "Preparing the reusable Livewire world"
+./scripts/bootstrap-livewire-world
+
+step "Checking deterministic tooling"
+python3 -m unittest discover -s tests -v
+npm --prefix review-portal run typecheck
+
+printf '\nOrb setup complete.\n'

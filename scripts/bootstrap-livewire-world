@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cache_dir="$repo_root/.cache"
+livewire_git="$cache_dir/livewire.git"
+playground="$cache_dir/playground-template"
+
+mkdir -p "$cache_dir"
+
+if [[ ! -d "$livewire_git" ]]; then
+  git clone --bare --filter=blob:none https://github.com/livewire/livewire.git "$livewire_git"
+else
+  git --git-dir="$livewire_git" remote set-url origin https://github.com/livewire/livewire.git
+fi
+
+if [[ ! -f "$playground/artisan" ]]; then
+  rm -rf "$playground"
+  composer create-project laravel/laravel:^12.0 "$playground" --no-interaction --prefer-dist
+fi
