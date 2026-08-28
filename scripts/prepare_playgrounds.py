@@ -46,6 +46,15 @@ def configure_composer(app: pathlib.Path, target: pathlib.Path) -> None:
     composer_path.write_text(json.dumps(composer, indent=4) + "\n")
 
 
+def set_env_value(path: pathlib.Path, key: str, value: str) -> None:
+    lines = path.read_text().splitlines()
+    setting = f"{key}={value}"
+    updated = [setting if line.startswith(f"{key}=") else line for line in lines]
+    if not any(line.startswith(f"{key}=") for line in lines):
+        updated.append(setting)
+    path.write_text("\n".join(updated) + "\n")
+
+
 def chrome_binary() -> pathlib.Path:
     configured = os.environ.get("CHROME_BINARY")
     candidates = [pathlib.Path(configured)] if configured else []
@@ -129,6 +138,7 @@ def main() -> int:
         env_path = app / ".env"
         if not env_path.exists():
             shutil.copy2(app / ".env.example", env_path)
+        set_env_value(env_path, "SESSION_COOKIE", f"livewire_review_{state}_session")
         database = app / "database" / "database.sqlite"
         database.touch()
         execute(

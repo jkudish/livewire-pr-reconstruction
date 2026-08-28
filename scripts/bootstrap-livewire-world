@@ -18,3 +18,41 @@ if [[ ! -f "$playground/artisan" ]]; then
   rm -rf "$playground"
   composer create-project laravel/laravel:^12.0 "$playground" --no-interaction --prefer-dist
 fi
+
+cat > "$playground/app/Providers/AppServiceProvider.php" <<'PHP'
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        //
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        if ($this->app->runningInConsole()) {
+            return;
+        }
+
+        $prefix = request()->header('X-Reconstruction-Prefix', '');
+        $host = request()->getHost();
+
+        if ($prefix !== '' || str_ends_with($host, '.onamp.dev')) {
+            URL::forceRootUrl('https://'.$host.$prefix);
+            URL::forceScheme('https');
+        }
+    }
+}
+PHP

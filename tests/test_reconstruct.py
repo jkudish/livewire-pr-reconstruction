@@ -46,6 +46,13 @@ class ReconstructTests(unittest.TestCase):
         manifest = {
             "schema_version": 1,
             "pr": {},
+            "summary": {
+                "problem": "Problem",
+                "submitted_fix": "Fix",
+                "outcome": "Outcome",
+                "comparison": "Comparison",
+                "reproduction_steps": [],
+            },
             "revisions": {},
             "evidence": [{"environment": item} for item in reconstruct.ENVIRONMENTS],
             "environments": [{"id": item} for item in reconstruct.ENVIRONMENTS],
@@ -82,6 +89,13 @@ class ReconstructTests(unittest.TestCase):
         manifest = {
             "schema_version": 1,
             "pr": {},
+            "summary": {
+                "problem": "Problem",
+                "submitted_fix": "Fix",
+                "outcome": "Outcome",
+                "comparison": "Comparison",
+                "reproduction_steps": [],
+            },
             "revisions": {},
             "evidence": [{"environment": item} for item in reconstruct.ENVIRONMENTS],
             "environments": [{"id": item} for item in reconstruct.ENVIRONMENTS],
@@ -99,6 +113,13 @@ class ReconstructTests(unittest.TestCase):
         manifest = {
             "schema_version": 1,
             "pr": {},
+            "summary": {
+                "problem": "Problem",
+                "submitted_fix": "Fix",
+                "outcome": "Outcome",
+                "comparison": "Comparison",
+                "reproduction_steps": [],
+            },
             "revisions": {},
             "evidence": [{"environment": item} for item in reconstruct.ENVIRONMENTS],
             "environments": [{"id": item} for item in reconstruct.ENVIRONMENTS],

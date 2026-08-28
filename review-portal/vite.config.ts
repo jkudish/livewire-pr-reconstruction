@@ -55,5 +55,20 @@ function currentRunManifest(): Plugin {
 
 export default defineConfig({
   plugins: [currentRunManifest(), react(), tailwindcss()],
-  server: { allowedHosts: process.env.AMP_ORB ? true : undefined },
+  server: {
+    allowedHosts: process.env.AMP_ORB ? true : undefined,
+    proxy: Object.fromEntries([
+      ['before', 8101],
+      ['original', 8102],
+      ['reconstruction', 8103],
+    ].map(([environment, port]) => {
+      const prefix = `/environment/${environment}`
+      return [prefix, {
+        target: `http://127.0.0.1:${port}`,
+        changeOrigin: false,
+        headers: { 'X-Reconstruction-Prefix': prefix, 'X-Forwarded-Proto': 'https' },
+        rewrite: (requestPath: string) => requestPath.slice(prefix.length) || '/',
+      }]
+    })),
+  },
 })

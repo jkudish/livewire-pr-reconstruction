@@ -45,7 +45,15 @@ export interface Story {
 
 export interface RunManifest {
   schema_version: 1
-  pr: { number: number; title: string; source: string; confidence: 'high' | 'medium' | 'low' }
+  target: { repository: string; pull_request: number; url: string }
+  pr: { number: number; title: string; source?: string; confidence?: 'high' | 'medium' | 'low' }
+  summary: {
+    problem: string
+    submitted_fix: string
+    outcome: string
+    comparison: string
+    reproduction_steps: string[]
+  }
   revisions: { base: string; head: string; reconstruction: string }
   review_status: 'verified' | 'candidate'
   evidence: Evidence[]
@@ -60,8 +68,11 @@ export function parseRunManifest(value: unknown): RunManifest {
   if (!value || typeof value !== 'object') throw new Error('Manifest must be a JSON object.')
   const run = value as Partial<RunManifest>
   if (run.schema_version !== 1) throw new Error('Unsupported or missing schema_version (expected 1).')
-  if (!run.pr?.title || !run.pr.source || !run.revisions?.base || !run.revisions.head || !run.revisions.reconstruction) {
+  if (!run.target?.url || !run.pr?.title || !run.revisions?.base || !run.revisions.head || !run.revisions.reconstruction) {
     throw new Error('PR identity and revision fields are required.')
+  }
+  if (!run.summary?.problem || !run.summary.submitted_fix || !run.summary.outcome || !run.summary.comparison || !Array.isArray(run.summary.reproduction_steps)) {
+    throw new Error('Reviewer-facing problem, fix, outcome, comparison, and reproduction steps are required.')
   }
   for (const key of ['evidence', 'environments', 'stories', 'diffs', 'uncertainties', 'unjustified_production_changes'] as const) {
     if (!Array.isArray(run[key])) throw new Error(`"${key}" must be an array.`)

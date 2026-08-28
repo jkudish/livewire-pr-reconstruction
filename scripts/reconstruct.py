@@ -196,7 +196,7 @@ def collect_diffs(metadata: dict[str, Any], reconstruction_head: str) -> list[di
             entry["reconstruction_commit"] = commit
         entries += step_entries
 
-    entries += diff_entries(original, reconstruction_head, "comparison", "Original vs reconstruction")
+    entries += diff_entries(original, reconstruction_head, "comparison", "Submitted PR vs reconstruction")
     return entries
 
 
@@ -297,6 +297,13 @@ def initial_manifest(metadata: dict[str, Any]) -> dict[str, Any]:
             "source": "PR description, changed tests, and production diff",
             "confidence": "low",
         },
+        "summary": {
+            "problem": "The reviewer-facing problem description has not been authored yet.",
+            "submitted_fix": "The submitted fix has not been explained yet.",
+            "outcome": "The reconstruction has not reached a conclusion yet.",
+            "comparison": "The submitted PR and reconstruction have not been compared yet.",
+            "reproduction_steps": [],
+        },
         "revisions": {
             "base": revisions["before"],
             "head": revisions["original"],
@@ -315,7 +322,7 @@ def initial_manifest(metadata: dict[str, Any]) -> dict[str, Any]:
         "environments": [
             {
                 "id": environment,
-                "label": environment.title(),
+                "label": "Submitted PR" if environment == "original" else environment.title(),
                 "sha": revisions[environment],
                 "description": {
                     "before": "Merge base",
@@ -457,6 +464,7 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         raise ReconstructionError("run.json schema_version must be 1")
     for key in (
         "pr",
+        "summary",
         "revisions",
         "evidence",
         "environments",
@@ -467,9 +475,14 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     ):
         if key not in manifest:
             raise ReconstructionError(f"run.json is missing {key}")
+    summary = manifest["summary"]
+    if not isinstance(summary, dict) or not all(isinstance(summary.get(key), str) and summary[key] for key in ("problem", "submitted_fix", "outcome", "comparison")):
+        raise ReconstructionError("run.json summary must explain the problem, submitted fix, outcome, and comparison")
+    if not isinstance(summary.get("reproduction_steps"), list) or not all(isinstance(step, str) for step in summary["reproduction_steps"]):
+        raise ReconstructionError("run.json summary reproduction_steps must be a list of strings")
     environments = {item.get("id") for item in manifest["environments"]}
     if environments != set(ENVIRONMENTS):
-        raise ReconstructionError("run.json must define Before, Original, and Reconstruction environments")
+        raise ReconstructionError("run.json must define Before, Submitted PR, and Reconstruction environments")
     evidence = {item.get("environment") for item in manifest["evidence"]}
     if evidence != set(ENVIRONMENTS):
         raise ReconstructionError("run.json must contain evidence for all three environments")

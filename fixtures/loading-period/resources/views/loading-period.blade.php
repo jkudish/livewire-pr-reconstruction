@@ -31,12 +31,20 @@
 <body>
 <main>
     <header>
-        <p>Before · Original · Reconstruction</p>
+        <p>Before · Submitted PR · Reconstruction</p>
         <h1>One loading period, even when requests overlap.</h1>
         <p>This small playground reproduces the behavior under review without adding demonstration code to Livewire itself.</p>
     </header>
     <livewire:loading-period-demo />
 </main>
 @livewireScripts
+<script>
+    const prefix = @js(request()->header('X-Reconstruction-Prefix', ''));
+    const livewireScript = document.querySelector('script[data-update-uri]')
+
+    if (prefix && livewireScript) {
+        livewireScript.dataset.updateUri = livewireScript.dataset.updateUri.replace(prefix + prefix, prefix)
+    }
+</script>
 </body>
 </html>

@@ -3,9 +3,9 @@
 Reconstructs a Livewire pull request inside an Amp Orb so a maintainer can see:
 
 1. **Before** — the merge base with the focused reproduction.
-2. **Original** — the submitted pull request against the same behavior.
+2. **Submitted PR** — the exact pull request head against the same behavior.
 3. **Reconstruction** — the smallest independently rebuilt complete solution.
-4. **Review** — one evidence-first page with all three environments, the causal story, and curated Pierre diffs.
+4. **Review** — one page that leads with the problem, fix, and conclusion, then exposes the three environments, proof, causal explanation, and curated Pierre diffs on demand.
 
 The first proof target is [livewire/livewire#10610](https://github.com/livewire/livewire/pull/10610).
 
@@ -27,7 +27,7 @@ Reconstruct in `.runs/current/targets/reconstruction`, creating one commit per c
 ./scripts/reconstruct validate
 ```
 
-The Review Portal reads the current run automatically and injects all three Amp Portal URLs. With no prepared run it falls back to the checked-in reconstruction of PR #10610. This first vertical slice includes an interactive playground fixture only for #10610; other PRs can be ingested and analyzed, but playground preparation stops honestly until a matching reproduction is authored.
+The Review Portal reads the current run automatically and injects all three Amp Portal URLs. It reverse-proxies those environments into one same-origin, tabbed viewer while preserving each direct Portal. With no prepared run it falls back to the checked-in reconstruction of PR #10610. This first vertical slice includes an interactive playground fixture only for #10610; other PRs can be ingested and analyzed, but playground preparation stops honestly until a matching reproduction is authored.
 
 ## Development
 

@@ -1,6 +1,6 @@
 ---
 name: reconstructing-livewire-prs
-description: Reconstruct a livewire/livewire pull request from its observable behavior, prove Before/Original/Reconstruction, and author the review package. Use after receiving a public Livewire PR URL.
+description: Reconstruct a livewire/livewire pull request from its observable behavior, prove Before/Submitted PR/Reconstruction, and author the review package. Use after receiving a public Livewire PR URL.
 ---
 
 # Reconstructing Livewire PRs
@@ -20,16 +20,16 @@ Run:
 The prepared run owns three immutable roles:
 
 - **Before**: the PR merge base plus only the reproduction evidence needed to observe the bug.
-- **Original**: the exact submitted PR head.
+- **Submitted PR**: the exact submitted PR head. Its internal environment ID remains `original`.
 - **Reconstruction**: the merge base plus an independently authored causal commit sequence.
 
-Never implement in Original. Do not copy production changes from Original into Reconstruction. Changed tests may be overlaid because they are evidence, not the proposed solution.
+Never implement in Submitted PR. Do not copy production changes from Submitted PR into Reconstruction. Changed tests may be overlaid because they are evidence, not the proposed solution.
 
 ## Understand before explaining
 
 Use evidence in this order:
 
-1. Run changed or relevant focused tests on Before and Original.
+1. Run changed or relevant focused tests on Before and Submitted PR.
 2. Reproduce user-visible behavior in the three playgrounds when the behavior is visual or interactive.
 3. Read changed tests, production diff, surrounding ownership code, linked issues, and PR prose.
 4. Inspect commit history only when it clarifies intent or exposes a corrected wrong turn.
@@ -63,7 +63,7 @@ The expected evidence shape is usually:
 
 ```text
 Before          FAIL
-Original        PASS
+Submitted PR    PASS
 Reconstruction  PASS
 ```
 
@@ -80,6 +80,14 @@ Refresh generated diffs after reconstruction commits:
 
 Edit `.runs/current/run.json`. Keep it concise enough to scan and detailed enough to provide true sight.
 
+Author `summary` first. It must explain in human language:
+
+- the user-visible or framework-level problem;
+- how the submitted PR attempts to fix it;
+- the reconstruction’s conclusion;
+- how the submitted PR differs from the reconstruction;
+- short reproduction steps when an interactive playground exists.
+
 For every story explain:
 
 1. what was wrong;
@@ -91,12 +99,13 @@ Attach each story only to the diff entries that implement it. Call out any produ
 
 The Review Portal must show:
 
-- the one-sentence problem and confidence/source;
-- Before/Original/Reconstruction evidence;
-- all three interactive environment portals;
+- linked PR number and title;
+- the problem, submitted fix, and reconstruction conclusion before implementation detail;
+- Before/Submitted PR/Reconstruction evidence, with screenshots and logs in clearly labeled disclosures;
+- all three interactive environment portals in one tabbed viewer, with direct Portal links;
 - causal reconstruction steps;
-- curated Pierre diffs for Base→Original, Base→Reconstruction, each step, and Original→Reconstruction;
-- uncertainties and unjustified production changes;
+- curated Pierre diffs for Base→Submitted PR, Base→Reconstruction, each step, and Submitted PR→Reconstruction, collapsed until requested;
+- only non-empty uncertainties and unjustified production changes;
 - explicit GitHub actions only when the reviewer invokes them.
 
 Amp Changes remains the raw escape hatch, not the primary explanation.
