@@ -25,14 +25,29 @@ The prepared run owns three immutable roles:
 
 Never implement in Submitted PR. Do not copy production changes from Submitted PR into Reconstruction. Changed tests may be overlaid because they are evidence, not the proposed solution.
 
+## Preserve the blind reconstruction boundary
+
+Wear two hats in sequence. Do not compare while reconstructing.
+
+During the blind reconstruction phase, use only:
+
+- the merge-base code;
+- PR or issue prose describing the problem;
+- changed or newly authored tests as behavioral evidence;
+- the Before reproduction and surrounding base-code ownership patterns.
+
+Do not inspect the submitted production diff, submitted implementation, submitted commit history, Submitted PR playground, or post-base code until the reconstruction solution is committed. Prefer a fresh Orb or agent context that receives a behavior brief and base revision without the PR number or head SHA.
+
+After committing the reconstruction, enter the comparison phase:
+
+1. Run the focused evidence against Submitted PR and Reconstruction.
+2. Inspect the submitted production diff and commit history.
+3. Compare final production code and explain material agreement or disagreement.
+4. Reproduce user-visible behavior in all three playgrounds when it adds understanding.
+
+If the submitted implementation was visible before the reconstruction was committed, label the result as an informed reconstruction. Never describe it as blind or independent convergence.
+
 ## Understand before explaining
-
-Use evidence in this order:
-
-1. Run changed or relevant focused tests on Before and Submitted PR.
-2. Reproduce user-visible behavior in the three playgrounds when the behavior is visual or interactive.
-3. Read changed tests, production diff, surrounding ownership code, linked issues, and PR prose.
-4. Inspect commit history only when it clarifies intent or exposes a corrected wrong turn.
 
 Label important claims by source and confidence. If the PR prose is weak, infer intent from executable evidence and code, then say that you inferred it.
 

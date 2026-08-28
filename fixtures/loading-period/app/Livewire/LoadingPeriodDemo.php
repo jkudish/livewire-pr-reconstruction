@@ -17,7 +17,7 @@ class LoadingPeriodDemo extends Component
     #[Renderless]
     public function slowAction(): void
     {
-        usleep(700000);
+        usleep(2000000);
         $this->dispatch('slow-finished');
     }
 

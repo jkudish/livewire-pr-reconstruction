@@ -60,7 +60,7 @@ function LogArtifact({ artifact }: { artifact: Artifact }) {
 
 function EvidenceMatrix({ run }: { run: RunManifest }) {
   return <section aria-labelledby="evidence-title" className="flex flex-col gap-5">
-    <SectionHeading id="evidence-title" title="The proof" description="The same focused reproduction is evaluated before the change, against the submitted PR, and against the independent reconstruction." />
+    <SectionHeading id="evidence-title" title="The proof" description="The same focused reproduction is evaluated before the change, against the submitted PR, and against the reconstruction." />
     <div className="grid gap-4 lg:grid-cols-3">
       {run.evidence.map((item) => {
         const environment = run.environments.find((candidate) => candidate.id === item.environment)
@@ -105,7 +105,7 @@ function Environments({ run }: { run: RunManifest }) {
 function DiffViewer({ diffs }: { diffs: DiffEntry[] }) {
   const items = useMemo<CodeViewItem[]>(() => diffs.flatMap((diff) => parsePatchFiles(diff.patch, diff.id, true).flatMap((patch, patchIndex) => patch.files.map((fileDiff, fileIndex) => ({ id: `${diff.id}-${patchIndex}-${fileIndex}`, type: 'diff' as const, fileDiff })))), [diffs])
   if (!items.length) return <p className="p-6 text-base/7 text-zinc-500 sm:text-sm/6">No files in this comparison.</p>
-  return <CodeView items={items} options={{ diffStyle: 'unified', theme: 'github-light', disableLineNumbers: false }} className="h-[34rem] sm:h-[40rem]" />
+  return <CodeView items={items} options={{ diffStyle: 'unified', theme: 'github-light', disableLineNumbers: false, overflow: 'wrap' }} className="h-[70dvh] min-h-[32rem] sm:h-[80dvh] sm:min-h-[48rem] sm:max-h-[72rem]" />
 }
 
 function Reconstruction({ run }: { run: RunManifest }) {
@@ -123,8 +123,13 @@ function Reconstruction({ run }: { run: RunManifest }) {
       <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-4 text-sm/6 text-emerald-950 sm:px-6"><span className="font-semibold">Proof:</span> {item.proof}</div>
     </article>)}</div>
     <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 sm:p-6"><p className="text-sm/6 font-semibold text-blue-800">Submitted PR vs reconstruction</p><p className="mt-2 max-w-4xl text-base/7 text-blue-950">{run.summary.comparison}</p></div>
-    <details className="overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200">
-      <summary className="focus-ring cursor-pointer p-5 sm:p-6"><span className="block text-base/7 font-semibold text-zinc-950">Code, when you need it</span><span className="mt-1 block text-sm/6 text-zinc-600">Open the curated Pierre diffs. Test changes stay separate from production code.</span></summary>
+    <details className="group overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200">
+      <summary className="focus-ring cursor-pointer list-none p-5 sm:p-6">
+        <span className="flex items-start gap-3">
+          <svg aria-hidden="true" viewBox="0 0 16 16" className="mt-1 size-4 shrink-0 fill-current group-open:rotate-90"><path d="M5 3.5 11 8l-6 4.5z" /></svg>
+          <span><span className="block text-base/7 font-semibold text-zinc-950">Code, when you need it</span><span className="mt-1 block text-sm/6 text-zinc-600">Open the curated Pierre diffs. Test changes stay separate from production code.</span></span>
+        </span>
+      </summary>
       <div className="border-t border-zinc-200 bg-zinc-50 p-4 sm:p-5">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Diff mode">{(['original', 'reconstruction', 'step', 'comparison'] as const).map((item) => <button key={item} onClick={() => setMode(item)} className={`${button} ${mode === item ? 'bg-zinc-900 text-white ring-zinc-900 hover:bg-zinc-800' : 'bg-white text-zinc-700'}`}>{labels[item]}</button>)}</div>
         <div className="mt-4 overflow-hidden rounded-lg bg-white ring-1 ring-zinc-200"><div className="border-b border-zinc-200 p-4"><p className="text-sm/6 font-semibold">Production code · {labels[mode]}</p></div>{production.length ? <DiffViewer diffs={production} /> : <p className="p-6 text-base/7 text-zinc-600">{mode === 'comparison' ? 'The submitted PR and reconstruction have identical production code, so there is no production diff to render.' : 'This view contains no production-code changes.'}</p>}</div>

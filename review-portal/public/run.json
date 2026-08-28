@@ -20,12 +20,12 @@
   "summary": {
     "problem": "wire:loading can erase a class or attribute that existed before loading began. With overlapping requests, the first request to finish can also end the loading state while another request is still running.",
     "submitted_fix": "The PR snapshots the element’s original state, treats overlapping requests as one loading period, and restores the snapshot only after the final request finishes.",
-    "outcome": "The independent reconstruction agrees with the submitted fix. The same four regressions fail before the change and pass in both fixed versions.",
-    "comparison": "The reconstruction reached the same production code in two causal steps. The only packaging difference is that the submitted PR commits the regression tests while the reconstruction uses those tests as external evidence.",
+    "outcome": "The submitted PR is the verified solution: all four regressions fail before it and pass afterward. This reconstruction found no simpler or materially different production implementation.",
+    "comparison": "The Submitted PR and Reconstruction contain byte-for-byte identical production code. The reconstruction is an explanation of how the submitted fix works, not evidence of a blind independent convergence in this run.",
     "reproduction_steps": [
-      "Start the fast request, then immediately start the slow request.",
-      "After Fast finishes, the shared target should still be disabled and keep its existing class.",
-      "After Slow finishes, the target should return to its original idle state."
+      "Select Before and click Run reproduction once.",
+      "The saved checkpoint should report Bug reproduced in red.",
+      "Repeat in Submitted PR and Reconstruction; both should report Fix holds in green."
     ]
   },
   "revisions": {
@@ -77,7 +77,7 @@
       "environment": "reconstruction",
       "status": "passed",
       "assertion": "Existing DOM state survives one continuous loading period.",
-      "explanation": "Two independently ordered causal steps reproduce the submitted production fix exactly and pass the same executable evidence.",
+      "explanation": "The reconstruction contains the same production code as the submitted PR and passes the same executable evidence.",
       "output": "Exit 0 \u00b7 4 tests, 17 assertions \u00b7 PASS\nJavaScript suite: 110 passed, 1 skipped\nProduction comparison with Submitted PR: identical",
       "artifacts": [
         {
