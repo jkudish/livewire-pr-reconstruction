@@ -151,7 +151,7 @@ function DiffEntryViewer({ diff, compact = false }: { diff: DiffEntry; compact?:
   const displayName = filename.split('/').pop() ?? filename
   const codeViewClass = view === 'file'
     ? 'min-h-[36rem]'
-    : `overflow-y-auto overscroll-contain ${compact ? 'h-[32rem] min-h-[24rem] max-h-[50rem]' : 'h-[78dvh] min-h-[36rem] max-h-[72rem]'}`
+    : `overflow-y-auto overscroll-contain ${compact ? 'max-h-[50rem]' : 'max-h-[72rem]'}`
 
   return <div className="overflow-hidden rounded-lg border border-zinc-950/10 bg-white">
     <div className="flex flex-col gap-3 border-b border-zinc-950/10 p-4 sm:flex-row sm:items-center sm:justify-between">
