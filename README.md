@@ -1,31 +1,19 @@
 # Livewire PR Reconstruction
 
+**New user?** Start with [Getting Started](GETTING_STARTED.md) for repository access, Amp Project setup, the working demo, and the manual PR review workflow.
+
 Reconstructs a Livewire pull request inside an Amp Orb so a maintainer can see:
 
 1. **Before** — the merge base with the focused reproduction.
 2. **Submitted PR** — the exact pull request head against the same behavior.
 3. **Reconstruction** — the smallest independently rebuilt complete solution.
-4. **Review** — one page that leads with the problem, fix, and conclusion, then exposes the three environments, proof, causal explanation, and curated Pierre diffs on demand.
+4. **Review** — one page that leads with the problem, fix, and recommendation, then exposes the three environments, proof, causal explanation, and curated Pierre diffs on demand.
 
-The checked-in canonical review companion is [livewire/livewire#10572](https://github.com/livewire/livewire/pull/10572). It follows the submitted minimum, the fail-closed counterexamples, the blind scoped reconstruction, the binding-order counterexample, and the final userland decision. Rebuild its pinned source and expandable diffs with:
+The checked-in canonical review companion is [livewire/livewire#10572](https://github.com/livewire/livewire/pull/10572). It follows the submitted minimum, the fail-closed counterexamples, the blind scoped reconstruction, the binding-order counterexample, and the final recommendation to keep the solution in userland. Rebuild its pinned source and expandable diffs with:
 
 ```bash
 python3 scripts/build_demo_10572.py
 ```
-
-## Open the review companion in a fresh Amp Orb
-
-Until this prototype branch is merged to `main`, clone it explicitly:
-
-```bash
-gh repo clone jkudish/livewire-pr-reconstruction livewire-pr-reconstruction -- \
-  --branch build/vertical-slice --single-branch
-cd livewire-pr-reconstruction
-./.agents/setup
-amp orb services ensure
-```
-
-Open the `review` Portal printed by the last command. The checked-in #10572 companion opens immediately; you do not need to prepare or rebuild a run first.
 
 ## Current vertical slice
 

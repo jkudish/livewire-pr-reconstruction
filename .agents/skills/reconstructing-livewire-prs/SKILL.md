@@ -123,7 +123,7 @@ Author `summary` only after the post-reveal challenge phase. It must explain in 
 - the minimum functioning solution and what it immediately reveals;
 - the next constraint and why another level is or is not justified;
 - where the submitted PR sits on the minimum/maximum/evaporate/userland spectrum;
-- the final conclusion, including any superseded reconstruction conclusion;
+- the final recommendation, including any superseded reconstruction recommendation;
 - short reproduction steps when an interactive playground exists.
 
 For every story explain:
@@ -140,7 +140,7 @@ The Review Portal must show:
 - linked PR number and title;
 - the Level 1 production diff and decisive proof before long prose;
 - each later functioning level as the next chapter, with the constraint that requires it;
-- the experiential problem, submitted comparison, and final conclusion;
+- the experiential problem, submitted comparison, and final recommendation;
 - Before/Submitted PR/Reconstruction evidence, with screenshots and logs in clearly labeled disclosures;
 - interactive environment portals only when they improve understanding, with direct Portal links;
 - curated Pierre diffs for each level, Base→Submitted PR, and Submitted PR→Reconstruction;
