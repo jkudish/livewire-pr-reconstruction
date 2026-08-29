@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { parsePatchFiles, type CodeViewItem } from '@pierre/diffs'
 import { CodeView } from '@pierre/diffs/react'
-import { CodeBracketIcon, DocumentTextIcon } from '@heroicons/react/16/solid'
+import {
+  ArrowPathIcon,
+  CheckIcon,
+  CodeBracketIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  MinusIcon,
+  XMarkIcon,
+} from '@heroicons/react/16/solid'
 import {
   parseRunManifest,
   type Artifact,
@@ -14,28 +22,55 @@ import {
   type RunManifest,
 } from './types'
 
-const statusStyles: Record<EvidenceStatus, string> = {
-  failed: 'bg-red-50 text-red-700 ring-red-200',
-  passed: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  blocked: 'bg-amber-50 text-amber-800 ring-amber-200',
-  skipped: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
+type BadgeTone = 'blue' | 'red' | 'amber' | 'emerald' | 'zinc'
+type BadgeIcon = 'check' | 'error' | 'warning' | 'superseded' | 'skipped'
+
+const badgeStyles: Record<BadgeTone, string> = {
+  blue: 'bg-blue-50 text-blue-700',
+  red: 'bg-red-50 text-red-700',
+  amber: 'bg-amber-50 text-amber-700',
+  emerald: 'bg-emerald-50 text-emerald-700',
+  zinc: 'bg-zinc-100 text-zinc-600',
 }
 
-const levelStatusStyles: Record<DeconstructionLevel['status'], string> = {
-  working: 'bg-blue-50 text-blue-700 ring-blue-200',
-  rejected: 'bg-red-50 text-red-700 ring-red-200',
-  superseded: 'bg-amber-50 text-amber-800 ring-amber-200',
+const badgeIcons = {
+  check: CheckIcon,
+  error: XMarkIcon,
+  warning: ExclamationTriangleIcon,
+  superseded: ArrowPathIcon,
+  skipped: MinusIcon,
 }
 
-const recommendationStatus: Record<RecommendationOption['status'], { label: string; style: string }> = {
-  not_recommended: { label: 'Not recommended', style: 'bg-red-50 text-red-700 ring-red-200' },
-  disproportionate: { label: 'Disproportionate', style: 'bg-amber-50 text-amber-800 ring-amber-200' },
-  recommended: { label: 'Recommended', style: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+const evidenceBadge: Record<EvidenceStatus, { tone: BadgeTone; icon: BadgeIcon }> = {
+  failed: { tone: 'red', icon: 'error' },
+  passed: { tone: 'emerald', icon: 'check' },
+  blocked: { tone: 'amber', icon: 'warning' },
+  skipped: { tone: 'zinc', icon: 'skipped' },
+}
+
+const levelBadge: Record<DeconstructionLevel['status'], { tone: BadgeTone; icon: BadgeIcon }> = {
+  working: { tone: 'blue', icon: 'check' },
+  rejected: { tone: 'red', icon: 'error' },
+  superseded: { tone: 'amber', icon: 'superseded' },
+}
+
+const recommendationBadge: Record<RecommendationOption['status'], { label: string; tone: BadgeTone; icon: BadgeIcon }> = {
+  not_recommended: { label: 'Not recommended', tone: 'red', icon: 'error' },
+  disproportionate: { label: 'Disproportionate', tone: 'amber', icon: 'warning' },
+  recommended: { label: 'Recommended', tone: 'emerald', icon: 'check' },
 }
 
 const button = 'focus-ring rounded-md px-3 py-2.5 text-base/7 font-semibold ring-1 ring-zinc-300 hover:bg-zinc-100 sm:py-2 sm:text-sm/6'
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const environmentLabel = (environment: EnvironmentKind) => environment === 'original' ? 'Submitted PR' : cap(environment)
+
+function StatusBadge({ children, tone, icon }: { children: ReactNode; tone: BadgeTone; icon: BadgeIcon }) {
+  const Icon = badgeIcons[icon]
+  return <span className={`inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-xs/4 font-medium whitespace-nowrap ${badgeStyles[tone]}`}>
+    <Icon className="size-3 shrink-0" aria-hidden="true" />
+    {children}
+  </span>
+}
 
 function SectionHeading({ id, title, description }: { id: string; title: string; description?: string }) {
   return <div className="max-w-[70ch]">
@@ -109,7 +144,7 @@ function EvidenceMatrix({ run }: { run: RunManifest }) {
         const videos = item.artifacts?.filter((artifact) => artifact.type === 'video') ?? []
         const logs = item.artifacts?.filter((artifact) => artifact.type === 'log') ?? []
         return <article key={item.environment} className="flex min-w-0 flex-col rounded-xl border border-zinc-950/10 p-5">
-          <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">{environmentLabel(item.environment)}</h3><span className={`rounded-full px-2.5 py-1 text-base/7 font-semibold ring-1 sm:text-sm/6 ${statusStyles[item.status]}`}>{evidenceStatus(item)}</span></div>
+          <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">{environmentLabel(item.environment)}</h3><StatusBadge {...evidenceBadge[item.status]}>{evidenceStatus(item)}</StatusBadge></div>
           <p className="mt-4 text-pretty text-base/7 text-zinc-600">{item.explanation}</p>
           {environment?.portal_url && <a className="focus-ring mt-4 w-fit rounded text-base/7 font-semibold text-blue-700 hover:underline sm:text-sm/6" href={environment.portal_url} target="_blank" rel="noreferrer">Open live reproduction ↗</a>}
           {(item.output || images.length > 0 || videos.length > 0 || logs.length > 0) && <details className="mt-5 border-t border-zinc-950/10 pt-4">
@@ -206,7 +241,7 @@ function Level({ level, index, run }: { level: DeconstructionLevel; index: numbe
         <p className="font-mono text-base/7 font-medium uppercase tracking-wide text-zinc-500 sm:text-sm/6">{level.label}</p>
         <h3 className="mt-1 text-balance text-2xl font-semibold tracking-tight text-zinc-950">{level.title}</h3>
       </div>
-      <span className={`w-fit rounded-full px-2.5 py-1 text-base/7 font-semibold ring-1 sm:text-sm/6 ${levelStatusStyles[level.status]}`}>{cap(level.status)}</span>
+      <StatusBadge {...levelBadge[level.status]}>{cap(level.status)}</StatusBadge>
     </div>
     <p className="mt-4 max-w-[75ch] text-pretty text-base/7 text-zinc-700">{level.summary}</p>
     <dl className="mt-5 grid gap-4 border-y border-zinc-950/10 py-5 lg:grid-cols-2">
@@ -241,7 +276,7 @@ function DeconstructionReview({ run }: { run: RunManifest }) {
     <section aria-labelledby="options-title" className="flex flex-col gap-5">
       <SectionHeading id="options-title" title="Options considered" />
       <div className="divide-y divide-zinc-950/10 border-y border-zinc-950/10">{recommendation.options.map((option) => <article key={option.title} className="grid gap-3 py-5 lg:grid-cols-[minmax(14rem,0.7fr)_minmax(0,1.3fr)] lg:gap-8">
-        <div className="flex flex-col items-start gap-2"><h3 className="text-lg font-semibold text-zinc-950">{option.title}</h3><span className={`rounded-full px-2.5 py-1 text-base/7 font-semibold ring-1 sm:text-sm/6 ${recommendationStatus[option.status].style}`}>{recommendationStatus[option.status].label}</span></div>
+        <div className="flex flex-col items-start gap-2"><h3 className="text-lg font-semibold text-zinc-950">{option.title}</h3><StatusBadge tone={recommendationBadge[option.status].tone} icon={recommendationBadge[option.status].icon}>{recommendationBadge[option.status].label}</StatusBadge></div>
         <p className="text-pretty text-base/7 text-zinc-600">{option.explanation}</p>
       </article>)}</div>
     </section>
