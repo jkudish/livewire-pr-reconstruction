@@ -27,7 +27,18 @@ class ReconstructTests(unittest.TestCase):
             (target / "BrowserTest.php").write_text("submitted\n" if environment == "original" else "base\n")
             subprocess.run(["git", "add", "."], cwd=target, check=True)
             subprocess.run(
-                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "fixture"],
+                [
+                    "git",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-qm",
+                    "fixture",
+                ],
                 cwd=target,
                 check=True,
             )
