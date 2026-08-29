@@ -33,7 +33,7 @@ Reconstruct in `.runs/current/targets/reconstruction`, creating one commit per c
 ./scripts/reconstruct validate
 ```
 
-The Review Portal opens the checked-in #10572 companion by default. Add `?run=/run.json` to review the current prepared run with all three Amp Portal URLs injected. For runs with interactive playgrounds, it reverse-proxies those environments into one same-origin, tabbed viewer while preserving each direct Portal. The first vertical slice includes an interactive playground fixture only for #10610; other PRs can be ingested and analyzed, but playground preparation stops honestly until a matching reproduction is authored.
+The Review Portal opens the checked-in #10572 companion by default. Add `?run=/run.json` to review the current prepared run with all three Amp Portal URLs injected. For runs with interactive playgrounds, it reverse-proxies those environments into one same-origin, tabbed viewer while preserving each direct Portal. The first vertical slice includes an interactive playground fixture only for #10610; other PRs continue as test-backed reviews until a matching interactive fixture is authored.
 
 ## Development
 

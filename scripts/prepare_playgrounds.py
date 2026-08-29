@@ -123,8 +123,11 @@ def main() -> int:
     pull_request = metadata["target"]["pull_request"]
     fixture = FIXTURES.get(pull_request)
     if fixture is None:
-        print(f"error: no interactive playground fixture exists for Livewire PR #{pull_request}", file=sys.stderr)
-        return 1
+        print(
+            f"Skipped interactive playgrounds: no fixture exists for Livewire PR #{pull_request}. "
+            "Continue with a test-backed review."
+        )
+        return 0
     targets = {state: pathlib.Path(metadata["paths"][state]) for state in ENVIRONMENTS}
     install_target_dependencies(targets)
 

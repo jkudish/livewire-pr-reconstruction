@@ -30,7 +30,7 @@ class StatusHandler(http.server.BaseHTTPRequestHandler):
 <style>body{{margin:0;background:#fafafa;color:#18181b;font:16px/1.6 Inter,system-ui,sans-serif}}main{{width:min(40rem,calc(100% - 2rem));margin:12vh auto}}p{{color:#52525b}}code{{background:#f4f4f5;padding:.15rem .35rem;border-radius:.25rem}}</style></head>
 <body><main><p>{html.escape(self.environment.title())} portal</p><h1>The playground is not prepared yet.</h1>
 <p>Current run: <code>{html.escape(run_name)}</code></p>
-<p>Run <code>./scripts/prepare-playgrounds</code>. This portal will serve the matching Livewire environment on restart.</p></main></body></html>""".encode()
+<p>Interactive playgrounds are optional. Run <code>./scripts/prepare-playgrounds</code> when this PR has a matching fixture; otherwise use the test evidence in the Review Portal.</p></main></body></html>""".encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

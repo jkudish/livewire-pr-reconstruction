@@ -14,7 +14,6 @@ Run:
 ```bash
 ./scripts/reconstruct prepare https://github.com/livewire/livewire/pull/<number>
 ./scripts/reconstruct overlay-tests
-./scripts/prepare-playgrounds
 ```
 
 The prepared run owns three immutable roles:
@@ -24,6 +23,8 @@ The prepared run owns three immutable roles:
 - **Reconstruction**: the merge base plus an independently authored causal commit sequence.
 
 Never implement in Submitted PR. Do not copy production changes from Submitted PR into Reconstruction. Changed tests may be overlaid because they are evidence, not the proposed solution.
+
+Run `./scripts/prepare-playgrounds` only when an interactive reproduction materially improves understanding. If it reports that no fixture exists for the PR, continue with a test-backed review. A missing interactive fixture is not a failed run and must not block reconstruction or the Review Portal.
 
 ## Preserve the blind reconstruction boundary
 
@@ -46,7 +47,7 @@ After committing the reconstruction, enter the comparison phase:
 4. For every material disagreement, state the one safety or correctness fact on which each mechanism depends.
 5. Write and run the narrowest counterexample that could falsify each unproven fact. Include ordering, multiple-target, failure-path, authorization, and lifecycle cases only when the mechanism depends on them.
 6. Revise the recommendation when a counterexample fails. Explicitly supersede the earlier conclusion instead of preserving it as an unresolved alternative.
-7. Reproduce user-visible behavior in all three playgrounds when it adds understanding.
+7. Reproduce user-visible behavior in all three playgrounds when it adds understanding and a matching fixture exists.
 
 Blindness prevents anchoring; post-reveal adversarial comparison prevents confidence in a plausible but incomplete reconstruction. Do not publish the review story between these phases.
 

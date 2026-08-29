@@ -108,7 +108,7 @@ Drafting does not authorize posting. Reviewing does not authorize updating or me
 - Invocation is manual. There is no automatic webhook, PR label, or slash-command trigger yet.
 - PR #10572 is the polished checked-in deconstruction example.
 - PR #10610 has the first purpose-built interactive three-environment playground fixture.
-- Other Livewire PRs can be ingested, tested, reconstructed, and explained, but the agent may need to author PR-specific reproduction or playground code during the run.
+- Other Livewire PRs can be ingested, tested, reconstructed, and explained. The agent may need to author a PR-specific reproduction, but a missing interactive playground fixture does not block a test-backed review.
 - Some reviews will be test-backed without an interactive application Portal. That is a complete result when the test proves the behavior clearly.
 - GitHub comments, branch changes, approvals, and merges happen only after an explicit request.
 
