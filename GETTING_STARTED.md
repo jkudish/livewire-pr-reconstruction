@@ -1,14 +1,14 @@
 # Getting Started
 
-Use this guide when you have been given access to the Livewire PR Reconstruction repository and want to run it in your own Amp Orb.
+Use this guide to run the Livewire PR Reconstruction repository in your own Amp Orb.
 
 The first run to try is the checked-in review companion for [Livewire PR #10572](https://github.com/livewire/livewire/pull/10572). Once that works, provide another `livewire/livewire` pull request URL to start a new reconstruction.
 
 ## What you need
 
 - An [Amp](https://ampcode.com/) account.
-- GitHub access to the private [`jkudish/livewire-pr-reconstruction`](https://github.com/jkudish/livewire-pr-reconstruction) repository.
-- GitHub connected in your Amp integration settings so Amp can clone the private repository.
+- The public [`jkudish/livewire-pr-reconstruction`](https://github.com/jkudish/livewire-pr-reconstruction) repository URL.
+- GitHub connected in your Amp integration settings only if you want to select the repository from your GitHub picker or later perform authenticated GitHub actions. Amp can clone the public repository without a connection.
 - Your own write permission on `livewire/livewire` only if you later want Amp to comment, update a branch, approve, or merge. Viewing and reconstructing public Livewire PRs does not require that permission.
 
 You do not need PHP, Composer, Node.js, or a browser installed on your computer. The repository's `.agents/setup` prepares those inside the Orb.
@@ -19,13 +19,13 @@ You only need to do this once:
 
 1. Open [Amp Projects](https://ampcode.com/projects) and select **New Project**.
 2. Choose **Use an Existing Repository**.
-3. Select `jkudish/livewire-pr-reconstruction` from your connected GitHub repositories.
+3. Paste `https://github.com/jkudish/livewire-pr-reconstruction`, or select it from your connected GitHub repositories.
 4. Choose yourself as the owner for an independent private project. Choose a workspace only when its members should share access to the project and its threads.
 5. Start a new thread with **New Orb** as the executor and select the project you just created.
 
 Amp clones the repository and runs `.agents/setup` when it prepares the first Orb. A clean-room test completed that setup in about one minute. Later threads can reuse Amp's prepared snapshot and usually start faster.
 
-See Amp's [Orbs getting-started guide](https://ampcode.com/docs/orbs/getting-started) and [Projects documentation](https://ampcode.com/docs/projects) if the private repository does not appear in the project picker.
+See Amp's [Orbs getting-started guide](https://ampcode.com/docs/orbs/getting-started) and [Projects documentation](https://ampcode.com/docs/projects) if you need help creating the project.
 
 ## Open the working example
 
