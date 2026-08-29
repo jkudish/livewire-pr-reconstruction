@@ -90,7 +90,7 @@ class ReconstructTests(unittest.TestCase):
         patch = "diff --git a/production.js b/production.js\n--- a/production.js\n+++ b/production.js\n@@ -1 +1 @@\n-old\n+new"
 
         with (
-            mock.patch.object(reconstruct, "git_cache", side_effect=["production.js", patch]),
+            mock.patch.object(reconstruct, "git_cache", side_effect=["production.js", patch, patch]),
             mock.patch.object(reconstruct, "file_at_revision", side_effect=["old\n", "new\n"]),
         ):
             entries = reconstruct.diff_entries(
@@ -104,6 +104,7 @@ class ReconstructTests(unittest.TestCase):
             )
 
         self.assertEqual(entries[0]["path"], "production.js")
+        self.assertEqual(entries[0]["full_patch"], patch + "\n")
         self.assertEqual(entries[0]["full_file"]["contents"], "new\n")
         self.assertEqual(entries[0]["full_file"]["revision"], "head456")
         self.assertEqual(
@@ -171,7 +172,10 @@ class ReconstructTests(unittest.TestCase):
 
         reconstruct.validate_manifest(manifest)
         self.assertEqual(manifest["pr"]["number"], 10572)
+        self.assertEqual(manifest["deconstruction"]["recommendation"]["title"], "Do not land a framework fix")
+        self.assertNotIn("decision", manifest["deconstruction"])
         self.assertTrue(all(diff.get("full_file", {}).get("contents") for diff in manifest["diffs"]))
+        self.assertTrue(all(diff.get("full_patch") for diff in manifest["diffs"]))
         self.assertIsNone(manifest["diffs"][1]["full_file"].get("github_url"))
 
     def test_write_json_is_atomic_and_formatted(self) -> None:

@@ -185,6 +185,7 @@ def diff_entries(
         patch = git_cache("diff", "--binary", from_sha, to_sha, "--", path)
         if not patch:
             continue
+        full_patch = git_cache("diff", "--binary", "--unified=1000000", from_sha, to_sha, "--", path)
         before_contents = file_at_revision(from_sha, path)
         after_contents = file_at_revision(to_sha, path)
         full_contents = after_contents if after_contents is not None else before_contents
@@ -202,6 +203,7 @@ def diff_entries(
                 "kind": kind,
                 "category": category_for(path),
                 "patch": patch + "\n",
+                "full_patch": full_patch + "\n",
                 "path": path,
                 "source_links": source_links,
                 "full_file": {
@@ -559,11 +561,13 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         if environments or evidence:
             raise ReconstructionError("deconstruction companions do not define interactive environments")
         levels = deconstruction.get("levels") if isinstance(deconstruction, dict) else None
-        decision = deconstruction.get("decision") if isinstance(deconstruction, dict) else None
+        recommendation = deconstruction.get("recommendation") if isinstance(deconstruction, dict) else None
         if not isinstance(levels, list) or not levels:
             raise ReconstructionError("deconstruction companions require functioning levels")
-        if not isinstance(decision, dict) or not all(isinstance(decision.get(key), str) and decision[key] for key in ("title", "explanation")):
-            raise ReconstructionError("deconstruction companions require an explained final decision")
+        if not isinstance(recommendation, dict) or not all(isinstance(recommendation.get(key), str) and recommendation[key] for key in ("title", "explanation")):
+            raise ReconstructionError("deconstruction companions require an explained recommendation")
+        if not all(isinstance(recommendation.get(key), list) and recommendation[key] for key in ("reasons", "options", "application_paths")):
+            raise ReconstructionError("deconstruction recommendations require reasons, considered options, and application paths")
         known_diffs = set(diff_ids)
         for level in levels:
             references = level.get("diff_ids") if isinstance(level, dict) else None

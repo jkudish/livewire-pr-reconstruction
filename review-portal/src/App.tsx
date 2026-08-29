@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { parsePatchFiles, type CodeViewItem } from '@pierre/diffs'
 import { CodeView } from '@pierre/diffs/react'
+import { CodeBracketIcon, DocumentTextIcon } from '@heroicons/react/16/solid'
 import {
   parseRunManifest,
   type Artifact,
@@ -9,6 +10,7 @@ import {
   type EnvironmentKind,
   type Evidence,
   type EvidenceStatus,
+  type RecommendationOption,
   type RunManifest,
 } from './types'
 
@@ -23,17 +25,22 @@ const levelStatusStyles: Record<DeconstructionLevel['status'], string> = {
   working: 'bg-blue-50 text-blue-700 ring-blue-200',
   rejected: 'bg-red-50 text-red-700 ring-red-200',
   superseded: 'bg-amber-50 text-amber-800 ring-amber-200',
-  decision: 'bg-zinc-900 text-white ring-zinc-900',
+}
+
+const recommendationStatus: Record<RecommendationOption['status'], { label: string; style: string }> = {
+  not_recommended: { label: 'Not recommended', style: 'bg-red-50 text-red-700 ring-red-200' },
+  disproportionate: { label: 'Disproportionate', style: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  recommended: { label: 'Recommended', style: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
 }
 
 const button = 'focus-ring rounded-md px-3 py-2.5 text-base/7 font-semibold ring-1 ring-zinc-300 hover:bg-zinc-100 sm:py-2 sm:text-sm/6'
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const environmentLabel = (environment: EnvironmentKind) => environment === 'original' ? 'Submitted PR' : cap(environment)
 
-function SectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
+function SectionHeading({ id, title, description }: { id: string; title: string; description?: string }) {
   return <div className="max-w-[70ch]">
     <h2 id={id} className="text-balance text-2xl font-semibold tracking-tight">{title}</h2>
-    <p className="mt-2 text-pretty text-base/7 text-zinc-600">{description}</p>
+    {description && <p className="mt-2 text-pretty text-base/7 text-zinc-600">{description}</p>}
   </div>
 }
 
@@ -45,10 +52,13 @@ function Header({ run }: { run: RunManifest }) {
         <a className="focus-ring mt-2 block max-w-5xl rounded" href={run.target.url} target="_blank" rel="noreferrer">
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">{run.pr.title}</h1>
         </a>
-        <p className="mt-5 max-w-[75ch] text-pretty text-lg/8 text-zinc-600">{run.deconstruction.intro}</p>
         <div className="mt-8 max-w-5xl border-l-4 border-red-500 pl-5">
           <p className="text-base/7 font-semibold text-red-700 sm:text-sm/6">What the user experiences</p>
           <p className="mt-1 text-pretty text-base/7 text-zinc-700">{run.summary.problem}</p>
+        </div>
+        <div className="mt-8 max-w-5xl border-t border-zinc-950/10 pt-6">
+          <p className="text-base/7 font-semibold text-blue-700 sm:text-sm/6">What the submitted change proves, and what it doesn’t</p>
+          <p className="mt-2 max-w-[75ch] text-pretty text-base/7 text-zinc-600">{run.deconstruction.intro}</p>
         </div>
       </div>
     </header>
@@ -137,15 +147,20 @@ function Environments({ run }: { run: RunManifest }) {
 function DiffEntryViewer({ diff, compact = false }: { diff: DiffEntry; compact?: boolean }) {
   const [view, setView] = useState<'diff' | 'file'>('diff')
   const focusedItems = useMemo<CodeViewItem[]>(() => parsePatchFiles(diff.patch, diff.id, true).flatMap((patch, patchIndex) => patch.files.map((fileDiff, fileIndex) => ({ id: `${diff.id}-${patchIndex}-${fileIndex}`, type: 'diff' as const, fileDiff }))), [diff])
-  const fullFileItems = useMemo<CodeViewItem[]>(() => diff.full_file ? [{
-    id: `${diff.id}-full-file`,
-    type: 'file' as const,
-    file: {
-      name: diff.full_file.path,
-      contents: diff.full_file.contents,
-      cacheKey: `${diff.full_file.revision}:${diff.full_file.path}`,
-    },
-  }] : [], [diff])
+  const fullFileItems = useMemo<CodeViewItem[]>(() => {
+    if (diff.full_patch) {
+      return parsePatchFiles(diff.full_patch, `${diff.id}-full-file`, true).flatMap((patch, patchIndex) => patch.files.map((fileDiff, fileIndex) => ({ id: `${diff.id}-full-file-${patchIndex}-${fileIndex}`, type: 'diff' as const, fileDiff })))
+    }
+    return diff.full_file ? [{
+      id: `${diff.id}-full-file`,
+      type: 'file' as const,
+      file: {
+        name: diff.full_file.path,
+        contents: diff.full_file.contents,
+        cacheKey: `${diff.full_file.revision}:${diff.full_file.path}`,
+      },
+    }] : []
+  }, [diff])
   const items = view === 'file' && fullFileItems.length ? fullFileItems : focusedItems
   const filename = diff.path ?? diff.full_file?.path ?? diff.label
   const displayName = filename.split('/').pop() ?? filename
@@ -161,7 +176,13 @@ function DiffEntryViewer({ diff, compact = false }: { diff: DiffEntry; compact?:
           : <><p className="font-mono text-base/7 font-semibold text-zinc-950 sm:text-sm/6" title={filename}>{displayName}</p><p className="text-base/7 text-zinc-500 sm:text-sm/6">Local reconstruction · no GitHub revision</p></>}
         {!!diff.source_links?.length && <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">{diff.source_links.map((link) => <a key={`${link.label}-${link.url}`} className="focus-ring rounded text-base/7 text-zinc-600 hover:text-blue-700 hover:underline sm:text-sm/6" href={link.url} target="_blank" rel="noreferrer">{link.label} on GitHub ↗</a>)}</div>}
       </div>
-      {diff.full_file && <div className="flex shrink-0 items-center gap-3"><span className="text-base/7 font-medium text-zinc-500 sm:text-sm/6">{view === 'file' ? 'Full file' : 'Focused diff'}</span><button className={`${button} bg-white text-zinc-700`} type="button" onClick={() => setView((current) => current === 'diff' ? 'file' : 'diff')}>{view === 'diff' ? 'View full file' : 'View focused diff'}</button></div>}
+      {diff.full_file && <button className="focus-ring relative inline-flex shrink-0 items-center gap-1.5 rounded-md bg-white py-2 pr-3 pl-2 text-base/7 font-semibold text-zinc-700 ring-1 ring-zinc-300 hover:bg-zinc-100 sm:text-sm/6" type="button" onClick={() => setView((current) => current === 'diff' ? 'file' : 'diff')}>
+        <span className="pointer-fine:hidden absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2" aria-hidden="true" />
+        {view === 'diff'
+          ? <DocumentTextIcon className="h-lh size-4 shrink-0 fill-zinc-500" aria-hidden="true" />
+          : <CodeBracketIcon className="h-lh size-4 shrink-0 fill-zinc-500" aria-hidden="true" />}
+        {view === 'diff' ? 'View full file' : 'View focused diff'}
+      </button>}
     </div>
     {items.length
       ? <CodeView items={items} options={{ diffStyle: 'unified', theme: 'github-light', disableFileHeader: true, disableLineNumbers: false, overflow: 'wrap', unsafeCSS: '@media (max-width: 640px) { [data-overflow="wrap"] [data-line] { word-break: normal; overflow-wrap: anywhere; } }' }} className={codeViewClass} />
@@ -193,43 +214,45 @@ function Level({ level, index, run }: { level: DeconstructionLevel; index: numbe
       <div><dt className="text-base/7 font-semibold text-zinc-950 sm:text-sm/6">Decisive proof</dt><dd className="mt-1 text-pretty text-base/7 text-zinc-600">{level.proof}</dd></div>
     </dl>
     {level.output && <pre className="mt-5 overflow-auto whitespace-pre-wrap rounded-lg bg-zinc-950 p-4 text-sm/6 text-zinc-100">{level.output}</pre>}
-    {index === 0 && diffContent && <div className="mt-5">{diffContent}</div>}
-    {index > 0 && diffContent && <details className="mt-5 overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-zinc-950/10">
-      <summary className="focus-ring cursor-pointer p-4 text-base/7 font-semibold text-zinc-950 sm:text-sm/6">Inspect this level’s code</summary>
-      <div className="border-t border-zinc-950/10 p-4">{diffContent}</div>
-    </details>}
+    {diffContent && <div className="mt-5">{diffContent}</div>}
   </article>
 }
 
 function DeconstructionReview({ run }: { run: RunManifest }) {
   const deconstruction = run.deconstruction!
-  const spectrum = [
-    ['Minimum', deconstruction.spectrum.minimum],
-    ['Maximum', deconstruction.spectrum.maximum],
-    ['Evaporate', deconstruction.spectrum.evaporate],
-    ['Userland / punt', deconstruction.spectrum.userland],
-  ]
+  const recommendation = deconstruction.recommendation
 
   return <>
     <section aria-labelledby="tour-title" className="flex flex-col gap-8">
-      <SectionHeading id="tour-title" title="Start with the smallest solution" description="Each chapter is a functioning solution or a decisive constraint—not a slice of a predetermined final implementation." />
+      <SectionHeading id="tour-title" title="Start with the smallest solution" />
       <div>{deconstruction.levels.map((level, index) => <Level key={level.id} level={level} index={index} run={run} />)}</div>
     </section>
 
-    <section aria-labelledby="comparison-title" className="flex flex-col gap-5">
-      <SectionHeading id="comparison-title" title="What changed after the reveal" description="Blind reconstruction prevents anchoring. Comparing afterward exposes assumptions that deserve one more test." />
-      <div className="rounded-xl bg-zinc-50 p-5 ring-1 ring-zinc-950/10 sm:p-6"><p className="max-w-[85ch] text-pretty text-base/7 text-zinc-700">{deconstruction.submitted_comparison}</p></div>
+    <section aria-labelledby="recommendation-title" className="rounded-xl bg-zinc-950 p-6 text-white sm:p-8">
+      <p className="font-mono text-base/7 font-medium uppercase tracking-wide text-zinc-400 sm:text-sm/6">Review recommendation</p>
+      <h2 id="recommendation-title" className="mt-2 text-balance text-3xl font-semibold tracking-tight">{recommendation.title}</h2>
+      <p className="mt-4 max-w-[75ch] text-pretty text-base/7 text-zinc-300">{recommendation.explanation}</p>
+      <div className="mt-7 border-t border-white/15 pt-6">
+        <h3 className="text-lg font-semibold">Why we recommend this</h3>
+        <ul className="mt-4 grid gap-4 lg:grid-cols-3">{recommendation.reasons.map((reason) => <li key={reason} className="border-l border-white/20 pl-4 text-pretty text-base/7 text-zinc-300">{reason}</li>)}</ul>
+      </div>
     </section>
 
-    <section aria-labelledby="spectrum-title" className="flex flex-col gap-5">
-      <SectionHeading id="spectrum-title" title="The solution spectrum" description="The right review outcome is not always another framework patch." />
-      <dl className="grid border-y border-zinc-950/10 lg:grid-cols-2">{spectrum.map(([title, explanation], index) => <div key={title} className={`py-5 lg:px-6 ${index > 0 ? 'border-t border-zinc-950/10' : ''} ${index === 1 ? 'lg:border-l lg:border-t-0' : ''} ${index === 2 ? 'lg:border-t' : ''} ${index === 3 ? 'lg:border-l lg:border-t' : ''} ${index % 2 === 0 ? 'lg:pl-0' : 'lg:pr-0'}`}><dt className="text-lg font-semibold text-zinc-950">{title}</dt><dd className="mt-2 text-pretty text-base/7 text-zinc-600">{explanation}</dd></div>)}</dl>
+    <section aria-labelledby="options-title" className="flex flex-col gap-5">
+      <SectionHeading id="options-title" title="Options considered" />
+      <div className="divide-y divide-zinc-950/10 border-y border-zinc-950/10">{recommendation.options.map((option) => <article key={option.title} className="grid gap-3 py-5 lg:grid-cols-[minmax(14rem,0.7fr)_minmax(0,1.3fr)] lg:gap-8">
+        <div className="flex flex-col items-start gap-2"><h3 className="text-lg font-semibold text-zinc-950">{option.title}</h3><span className={`rounded-full px-2.5 py-1 text-base/7 font-semibold ring-1 sm:text-sm/6 ${recommendationStatus[option.status].style}`}>{recommendationStatus[option.status].label}</span></div>
+        <p className="text-pretty text-base/7 text-zinc-600">{option.explanation}</p>
+      </article>)}</div>
     </section>
 
-    <section aria-labelledby="decision-title" className="rounded-xl bg-zinc-950 p-6 text-white sm:p-8">
-      <p className="font-mono text-base/7 font-medium uppercase tracking-wide text-zinc-400 sm:text-sm/6">Final maintainer decision</p>
-      <h2 id="decision-title" className="mt-2 text-balance text-3xl font-semibold tracking-tight">{deconstruction.decision.title}</h2>
-      <p className="mt-4 max-w-[75ch] text-pretty text-base/7 text-zinc-300">{deconstruction.decision.explanation}</p>
+    <section aria-labelledby="application-paths-title" className="flex flex-col gap-5">
+      <SectionHeading id="application-paths-title" title="What applications can do instead" />
+      <div className="grid border-y border-zinc-950/10 lg:grid-cols-2">{recommendation.application_paths.map((path, index) => <article key={path.title} className={`py-5 lg:px-6 ${index > 0 ? 'border-t border-zinc-950/10 lg:border-l lg:border-t-0 lg:pr-0' : 'lg:pl-0'}`}>
+        <p className="text-base/7 font-semibold text-blue-700 sm:text-sm/6">{path.label}</p>
+        <h3 className="mt-1 text-lg font-semibold text-zinc-950">{path.title}</h3>
+        <p className="mt-2 text-pretty text-base/7 text-zinc-600">{path.explanation}</p>
+      </article>)}</div>
     </section>
   </>
 }

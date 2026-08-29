@@ -31,6 +31,7 @@ export interface DiffEntry {
   kind: DiffKind
   category: 'production' | 'evidence'
   patch: string
+  full_patch?: string
   path?: string
   source_links?: { label: string; url: string }[]
   full_file?: {
@@ -55,7 +56,7 @@ export interface DeconstructionLevel {
   id: string
   label: string
   title: string
-  status: 'working' | 'rejected' | 'superseded' | 'decision'
+  status: 'working' | 'rejected' | 'superseded'
   summary: string
   question: string
   proof: string
@@ -63,19 +64,27 @@ export interface DeconstructionLevel {
   diff_ids: string[]
 }
 
+export interface RecommendationOption {
+  title: string
+  status: 'not_recommended' | 'disproportionate' | 'recommended'
+  explanation: string
+}
+
+export interface ApplicationPath {
+  label: string
+  title: string
+  explanation: string
+}
+
 export interface Deconstruction {
   intro: string
   levels: DeconstructionLevel[]
-  spectrum: {
-    minimum: string
-    maximum: string
-    evaporate: string
-    userland: string
-  }
-  submitted_comparison: string
-  decision: {
+  recommendation: {
     title: string
     explanation: string
+    reasons: string[]
+    options: RecommendationOption[]
+    application_paths: ApplicationPath[]
   }
 }
 
@@ -117,8 +126,8 @@ export function parseRunManifest(value: unknown): RunManifest {
   if (!run.diffs!.every((diff) => diff.id && diff.label && typeof diff.patch === 'string')) {
     throw new Error('Every diff requires id, label, and patch.')
   }
-  if (run.deconstruction && (!Array.isArray(run.deconstruction.levels) || !run.deconstruction.decision?.title)) {
-    throw new Error('Deconstruction reviews require levels and a final decision.')
+  if (run.deconstruction && (!Array.isArray(run.deconstruction.levels) || !run.deconstruction.recommendation?.title || !Array.isArray(run.deconstruction.recommendation.reasons) || !Array.isArray(run.deconstruction.recommendation.options) || !Array.isArray(run.deconstruction.recommendation.application_paths))) {
+    throw new Error('Deconstruction reviews require levels and an explained recommendation.')
   }
   return run as RunManifest
 }

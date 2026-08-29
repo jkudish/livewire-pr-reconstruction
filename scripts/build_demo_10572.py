@@ -119,13 +119,13 @@ def make_blind_level_two(base: str) -> str:
     )
 
 
-def patch(before: str, after: str) -> str:
+def patch(before: str, after: str, context: int = 8) -> str:
     lines = difflib.unified_diff(
         before.splitlines(keepends=True),
         after.splitlines(keepends=True),
         fromfile=f"a/{PATH}",
         tofile=f"b/{PATH}",
-        n=8,
+        n=context,
     )
     return f"diff --git a/{PATH} b/{PATH}\n" + "".join(lines)
 
@@ -151,6 +151,7 @@ def diff_entry(
         "category": "production",
         "path": PATH,
         "patch": patch(before, after),
+        "full_patch": patch(before, after, context=1_000_000),
         "source_links": source_links,
         "full_file": {
             "path": PATH,
@@ -232,7 +233,7 @@ def main() -> None:
         "summary": {
             "problem": "A custom 404 page can contain a Livewire component that looks usable. Clicking it sends an update whose saved route points back to the missing model, so Laravel returns another 404 inside Livewire’s error modal instead of running the action.",
             "submitted_fix": "Catch the missing-model exception during persistent middleware replay so the Livewire action can continue.",
-            "outcome": "The five-line fix restores the interaction, but it also lets actions continue without middleware that follows model binding. A narrower blind reconstruction still cannot reliably distinguish a binding that failed from one Laravel never attempted. The safe review outcome is no framework patch.",
+            "outcome": "The five-line fix restores the interaction, but it also lets actions continue without middleware that follows model binding. A narrower blind reconstruction still cannot reliably distinguish a binding that failed from one Laravel never attempted. The review recommendation is not to land a framework patch.",
             "comparison": "The blind reconstruction independently rediscovered the submitted minimum, then tried to narrow it. The narrowing failed on binding order. A post-reveal provenance alternative avoids that inference but still opts marked snapshots out of route middleware replay.",
             "reproduction_steps": [],
         },
@@ -247,7 +248,7 @@ def main() -> None:
         "stories": [],
         "diffs": diffs,
         "deconstruction": {
-            "intro": "The submitted change works on the reported symptom. The review question is whether it preserves Livewire’s middleware and authorization guarantees while doing so.",
+            "intro": "Catching the missing-model exception does fix this exact interaction: the update returns 200 and the component action runs. But the exception interrupts persistent middleware replay, so a working button alone does not prove that later middleware, including authorization, still runs. The review must establish whether the fix preserves Livewire’s fail-closed guarantees, not merely whether it removes the visible 404.",
             "levels": [
                 {
                     "id": "minimum",
@@ -256,7 +257,7 @@ def main() -> None:
                     "status": "rejected",
                     "summary": "Both the submitted PR and the isolated blind trial arrive at the same small idea: catch ModelNotFoundException around persistent middleware replay. The custom 404 component can now update.",
                     "question": "When binding throws halfway through the middleware pipeline, what else did we just skip?",
-                    "proof": "The focused reproduction changes from update 404 to update 200. That proves the symptom is fixed—not that continuing is safe.",
+                    "proof": "The focused reproduction changes from update 404 to update 200. That proves the symptom is fixed. It does not prove that continuing is safe.",
                     "output": "Reported path\nBefore: expected 200, received 404\nAfter Level 1: OK (1 test, 4 assertions)",
                     "diff_ids": ["submitted-minimum"],
                 },
@@ -266,7 +267,7 @@ def main() -> None:
                     "title": "The minimum bypasses authorization",
                     "status": "rejected",
                     "summary": "The catch sits outside the middleware pipeline. Once SubstituteBindings throws, the pipeline unwinds; Livewire catches the exception and executes the component action anyway. Middleware after bindings never runs.",
-                    "question": "Can a model disappear—or an authorization check deny—without the action running?",
+                    "question": "Can a model disappear, or an authorization check deny, without the action running?",
                     "proof": "Two focused regressions fail against Level 1: a model deleted after a valid render no longer returns 404, and authorization after bindings no longer returns 403.",
                     "output": "Fail-closed checks against Level 1\nModel disappeared: expected 404, received 200\nAuthorization after bindings: expected 403, received 200",
                     "diff_ids": [],
@@ -296,7 +297,7 @@ def main() -> None:
                 {
                     "id": "post-reveal",
                     "label": "Post-reveal alternative",
-                    "title": "Signed error-page provenance removes the guess—but not the policy question",
+                    "title": "Signed error-page provenance removes the guess, but not the policy question",
                     "status": "superseded",
                     "summary": "The follow-up design marks snapshots created while Laravel renders a route-binding error page, then skips persistent middleware replay for those snapshots. The client cannot forge the marker, and binding order no longer matters.",
                     "question": "Should a component rendered before the original route middleware completed be allowed to run with no replay of that route middleware?",
@@ -304,16 +305,43 @@ def main() -> None:
                     "diff_ids": ["post-reveal-provenance"],
                 },
             ],
-            "spectrum": {
-                "minimum": "Catch ModelNotFoundException. It fixes the report in five production lines but demonstrably skips later authorization, so reject it.",
-                "maximum": "Record authoritative binding-attempt and completed-middleware provenance across the initial exception render and every later update. That is a lifecycle redesign for a narrow edge case.",
-                "evaporate": "Move interactive error behavior to a dedicated route or endpoint so the failed model-bound route never becomes the component’s update context.",
-                "userland": "Keep the error page static, use a dedicated Alpine/fetch endpoint, redirect to a non-model-bound Livewire error route, or deliberately remove SubstituteBindings from persistent replay while accepting the documented tenancy and deletion tradeoff.",
-            },
-            "submitted_comparison": "The blind pass was useful precisely because it did not stop at matching the submitted five-line catch. It exposed the fail-open path, built a plausible narrower mechanism, and then disproved that mechanism with one binding-order test. The post-reveal follow-up solved provenance more honestly, but still required an explicit decision to let marked snapshots bypass route middleware replay. That made the maintainer decision clear: the complete framework solution is disproportionate; the small ones have ambiguous security semantics.",
-            "decision": {
-                "title": "Punt the framework change; document the userland tradeoff",
-                "explanation": "Interactive Livewire components on route-binding exception pages remain unsupported at the framework level. Applications can remove SubstituteBindings from Livewire’s persistent middleware list if they deliberately accept that updates will no longer revalidate scoped or custom bindings or detect deleted route models.",
+            "recommendation": {
+                "title": "Do not land a framework fix",
+                "explanation": "This review recommends against landing a framework change. The reported behavior is real, but the small fixes weaken middleware guarantees, while complete support requires a disproportionate lifecycle redesign.",
+                "reasons": [
+                    "The submitted catch resolves the update 404 but lets the action continue after the middleware pipeline has unwound.",
+                    "The blind scoped fix cannot distinguish a binding that failed from one Laravel never attempted.",
+                    "The signed-provenance approach avoids that inference, but intentionally bypasses persistent route middleware for marked snapshots.",
+                ],
+                "options": [
+                    {
+                        "title": "Catch the exception",
+                        "status": "not_recommended",
+                        "explanation": "It fixes the visible symptom in five production lines, but demonstrably skips middleware that follows model binding, including authorization.",
+                    },
+                    {
+                        "title": "Build complete framework support",
+                        "status": "disproportionate",
+                        "explanation": "It requires authoritative binding-attempt and middleware-completion provenance across the initial exception render and every later update.",
+                    },
+                    {
+                        "title": "Handle it in the application",
+                        "status": "recommended",
+                        "explanation": "It keeps the exceptional interaction and its security tradeoffs explicit, local, and under the application’s control.",
+                    },
+                ],
+                "application_paths": [
+                    {
+                        "label": "Preferred",
+                        "title": "Use a dedicated error route",
+                        "explanation": "Move the interactive error experience to a non-model-bound route or endpoint so the failed route never becomes the component’s update context.",
+                    },
+                    {
+                        "label": "Explicit tradeoff",
+                        "title": "Opt out of binding replay",
+                        "explanation": "Remove SubstituteBindings from Livewire’s persistent middleware list only if the application deliberately accepts that updates will not revalidate scoped or custom bindings or detect deleted route models.",
+                    },
+                ],
             },
         },
         "uncertainties": [],
