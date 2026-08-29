@@ -6,6 +6,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "reconstruct.py"
 SPEC = importlib.util.spec_from_file_location("reconstruct", MODULE_PATH)
@@ -85,6 +86,38 @@ class ReconstructTests(unittest.TestCase):
         self.assertEqual(reconstruct.category_for("fixtures/loading/page.blade.php"), "evidence")
         self.assertEqual(reconstruct.category_for("js/directives/wire-loading.js"), "production")
 
+    def test_diff_entries_include_full_file_and_exact_github_links(self) -> None:
+        patch = "diff --git a/production.js b/production.js\n--- a/production.js\n+++ b/production.js\n@@ -1 +1 @@\n-old\n+new"
+
+        with (
+            mock.patch.object(reconstruct, "git_cache", side_effect=["production.js", patch]),
+            mock.patch.object(reconstruct, "file_at_revision", side_effect=["old\n", "new\n"]),
+        ):
+            entries = reconstruct.diff_entries(
+                "base123",
+                "head456",
+                "original",
+                "Submitted PR",
+                from_label="Before",
+                to_label="Submitted PR",
+                to_public=True,
+            )
+
+        self.assertEqual(entries[0]["path"], "production.js")
+        self.assertEqual(entries[0]["full_file"]["contents"], "new\n")
+        self.assertEqual(entries[0]["full_file"]["revision"], "head456")
+        self.assertEqual(
+            entries[0]["full_file"]["github_url"],
+            "https://github.com/livewire/livewire/blob/head456/production.js",
+        )
+        self.assertEqual(
+            entries[0]["source_links"],
+            [
+                {"label": "Before", "url": "https://github.com/livewire/livewire/blob/base123/production.js"},
+                {"label": "Submitted PR", "url": "https://github.com/livewire/livewire/blob/head456/production.js"},
+            ],
+        )
+
     def test_manifest_requires_all_three_environments(self) -> None:
         manifest = {
             "schema_version": 1,
@@ -130,6 +163,16 @@ class ReconstructTests(unittest.TestCase):
         }
         with self.assertRaises(reconstruct.ReconstructionError):
             reconstruct.validate_manifest(manifest)
+
+    def test_checked_in_deconstruction_companion_is_valid(self) -> None:
+        manifest = json.loads(
+            (MODULE_PATH.parents[1] / "review-portal" / "public" / "run.json").read_text()
+        )
+
+        reconstruct.validate_manifest(manifest)
+        self.assertEqual(manifest["pr"]["number"], 10572)
+        self.assertTrue(all(diff.get("full_file", {}).get("contents") for diff in manifest["diffs"]))
+        self.assertIsNone(manifest["diffs"][1]["full_file"].get("github_url"))
 
     def test_write_json_is_atomic_and_formatted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

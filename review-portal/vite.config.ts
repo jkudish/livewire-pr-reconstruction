@@ -12,11 +12,12 @@ function currentRunManifest(): Plugin {
   return {
     name: 'current-reconstruction-run',
     configureServer(server) {
-      server.middlewares.use('/run.json', (_request, response) => {
+      server.middlewares.use('/run.json', (request, response) => {
         const current = path.join(repositoryRoot, '.runs', 'current', 'run.json')
         const fallback = path.join(portalRoot, 'public', 'run.json')
         try {
-          const manifest = JSON.parse(fs.readFileSync(fs.existsSync(current) ? current : fallback, 'utf8'))
+          const fixtureRequested = new URL(request.url || '/', 'http://localhost').searchParams.get('fixture') === '1'
+          const manifest = JSON.parse(fs.readFileSync(!fixtureRequested && fs.existsSync(current) ? current : fallback, 'utf8'))
           const urls: Record<string, string | undefined> = {
             before: process.env.BEFORE_URL,
             original: process.env.ORIGINAL_URL,

@@ -31,6 +31,14 @@ export interface DiffEntry {
   kind: DiffKind
   category: 'production' | 'evidence'
   patch: string
+  path?: string
+  source_links?: { label: string; url: string }[]
+  full_file?: {
+    path: string
+    revision: string
+    contents: string
+    github_url?: string
+  }
 }
 
 export interface Story {
@@ -41,6 +49,34 @@ export interface Story {
   why_necessary: string
   proof: string
   diff_ids: string[]
+}
+
+export interface DeconstructionLevel {
+  id: string
+  label: string
+  title: string
+  status: 'working' | 'rejected' | 'superseded' | 'decision'
+  summary: string
+  question: string
+  proof: string
+  output?: string
+  diff_ids: string[]
+}
+
+export interface Deconstruction {
+  intro: string
+  levels: DeconstructionLevel[]
+  spectrum: {
+    minimum: string
+    maximum: string
+    evaporate: string
+    userland: string
+  }
+  submitted_comparison: string
+  decision: {
+    title: string
+    explanation: string
+  }
 }
 
 export interface RunManifest {
@@ -60,6 +96,7 @@ export interface RunManifest {
   environments: ReviewEnvironment[]
   stories: Story[]
   diffs: DiffEntry[]
+  deconstruction?: Deconstruction
   uncertainties: string[]
   unjustified_production_changes: string[]
 }
@@ -79,6 +116,9 @@ export function parseRunManifest(value: unknown): RunManifest {
   }
   if (!run.diffs!.every((diff) => diff.id && diff.label && typeof diff.patch === 'string')) {
     throw new Error('Every diff requires id, label, and patch.')
+  }
+  if (run.deconstruction && (!Array.isArray(run.deconstruction.levels) || !run.deconstruction.decision?.title)) {
+    throw new Error('Deconstruction reviews require levels and a final decision.')
   }
   return run as RunManifest
 }

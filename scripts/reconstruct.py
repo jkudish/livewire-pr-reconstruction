@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from typing import Any
+from urllib.parse import quote
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CACHE = ROOT / ".cache" / "livewire.git"
@@ -67,6 +68,10 @@ def ensure_cache() -> None:
 
 def git_cache(*arguments: str) -> str:
     return execute(["git", f"--git-dir={CACHE}", *arguments]).stdout.strip()
+
+
+def git_cache_raw(*arguments: str) -> str:
+    return execute(["git", f"--git-dir={CACHE}", *arguments]).stdout
 
 
 def gh_pr(number: int) -> dict[str, Any]:
@@ -149,12 +154,28 @@ def slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
+def file_at_revision(sha: str, path: str) -> str | None:
+    try:
+        return git_cache_raw("show", f"{sha}:{path}")
+    except ReconstructionError:
+        return None
+
+
+def github_blob_url(sha: str, path: str) -> str:
+    return f"https://github.com/livewire/livewire/blob/{sha}/{quote(path)}"
+
+
 def diff_entries(
     from_sha: str,
     to_sha: str,
     kind: str,
     label: str,
     id_prefix: str | None = None,
+    *,
+    from_label: str = "Before",
+    to_label: str = "Changed file",
+    from_public: bool = True,
+    to_public: bool = False,
 ) -> list[dict[str, Any]]:
     if from_sha == to_sha:
         return []
@@ -164,6 +185,16 @@ def diff_entries(
         patch = git_cache("diff", "--binary", from_sha, to_sha, "--", path)
         if not patch:
             continue
+        before_contents = file_at_revision(from_sha, path)
+        after_contents = file_at_revision(to_sha, path)
+        full_contents = after_contents if after_contents is not None else before_contents
+        full_revision = to_sha if after_contents is not None else from_sha
+        full_public = to_public if after_contents is not None else from_public
+        source_links = []
+        if from_public and before_contents is not None:
+            source_links.append({"label": from_label, "url": github_blob_url(from_sha, path)})
+        if to_public and after_contents is not None:
+            source_links.append({"label": to_label, "url": github_blob_url(to_sha, path)})
         entries.append(
             {
                 "id": f"{id_prefix or kind}-{index}-{slug(path)}",
@@ -171,6 +202,14 @@ def diff_entries(
                 "kind": kind,
                 "category": category_for(path),
                 "patch": patch + "\n",
+                "path": path,
+                "source_links": source_links,
+                "full_file": {
+                    "path": path,
+                    "revision": full_revision,
+                    "contents": full_contents,
+                    **({"github_url": github_blob_url(full_revision, path)} if full_public else {}),
+                } if full_contents is not None else None,
             }
         )
     return entries
@@ -180,8 +219,23 @@ def collect_diffs(metadata: dict[str, Any], reconstruction_head: str) -> list[di
     revisions = metadata["revisions"]
     merge_base = revisions["before"]
     original = revisions["original"]
-    entries = diff_entries(merge_base, original, "original", "Submitted PR")
-    entries += diff_entries(merge_base, reconstruction_head, "reconstruction", "Reconstruction")
+    entries = diff_entries(
+        merge_base,
+        original,
+        "original",
+        "Submitted PR",
+        from_label="Before",
+        to_label="Submitted PR",
+        to_public=True,
+    )
+    entries += diff_entries(
+        merge_base,
+        reconstruction_head,
+        "reconstruction",
+        "Reconstruction",
+        from_label="Before",
+        to_label="Local reconstruction",
+    )
 
     reconstruction_path = pathlib.Path(metadata["paths"]["reconstruction"])
     commits = execute(
@@ -191,12 +245,28 @@ def collect_diffs(metadata: dict[str, Any], reconstruction_head: str) -> list[di
     for step, commit in enumerate(filter(None, commits), start=1):
         parent = execute(["git", "rev-parse", f"{commit}^"], cwd=reconstruction_path).stdout.strip()
         subject = execute(["git", "show", "-s", "--format=%s", commit], cwd=reconstruction_path).stdout.strip()
-        step_entries = diff_entries(parent, commit, "step", f"Step {step}: {subject}", f"step-{step}")
+        step_entries = diff_entries(
+            parent,
+            commit,
+            "step",
+            f"Step {step}: {subject}",
+            f"step-{step}",
+            from_label="Before" if parent == merge_base else f"Level {step - 1}",
+            to_label=f"Level {step}",
+            from_public=parent == merge_base,
+        )
         for entry in step_entries:
             entry["reconstruction_commit"] = commit
         entries += step_entries
 
-    entries += diff_entries(original, reconstruction_head, "comparison", "Submitted PR vs reconstruction")
+    entries += diff_entries(
+        original,
+        reconstruction_head,
+        "comparison",
+        "Submitted PR vs reconstruction",
+        from_label="Submitted PR",
+        to_label="Local reconstruction",
+    )
     return entries
 
 
@@ -481,14 +551,29 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     if not isinstance(summary.get("reproduction_steps"), list) or not all(isinstance(step, str) for step in summary["reproduction_steps"]):
         raise ReconstructionError("run.json summary reproduction_steps must be a list of strings")
     environments = {item.get("id") for item in manifest["environments"]}
-    if environments != set(ENVIRONMENTS):
-        raise ReconstructionError("run.json must define Before, Submitted PR, and Reconstruction environments")
     evidence = {item.get("environment") for item in manifest["evidence"]}
-    if evidence != set(ENVIRONMENTS):
-        raise ReconstructionError("run.json must contain evidence for all three environments")
     diff_ids = [item.get("id") for item in manifest["diffs"]]
     if len(diff_ids) != len(set(diff_ids)):
         raise ReconstructionError("run.json diff IDs must be unique")
+    if deconstruction := manifest.get("deconstruction"):
+        if environments or evidence:
+            raise ReconstructionError("deconstruction companions do not define interactive environments")
+        levels = deconstruction.get("levels") if isinstance(deconstruction, dict) else None
+        decision = deconstruction.get("decision") if isinstance(deconstruction, dict) else None
+        if not isinstance(levels, list) or not levels:
+            raise ReconstructionError("deconstruction companions require functioning levels")
+        if not isinstance(decision, dict) or not all(isinstance(decision.get(key), str) and decision[key] for key in ("title", "explanation")):
+            raise ReconstructionError("deconstruction companions require an explained final decision")
+        known_diffs = set(diff_ids)
+        for level in levels:
+            references = level.get("diff_ids") if isinstance(level, dict) else None
+            if not isinstance(references, list) or not set(references).issubset(known_diffs):
+                raise ReconstructionError("deconstruction levels may reference only known diff IDs")
+    else:
+        if environments != set(ENVIRONMENTS):
+            raise ReconstructionError("run.json must define Before, Submitted PR, and Reconstruction environments")
+        if evidence != set(ENVIRONMENTS):
+            raise ReconstructionError("run.json must contain evidence for all three environments")
 
 
 def main(argv: list[str] | None = None) -> int:
